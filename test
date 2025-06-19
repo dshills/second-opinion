@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# Test runner script for Second Opinion MCP Server
+
+echo "🧪 Running Second Opinion Tests"
+echo "================================"
+
+# Check if .env file exists
+if [ ! -f .env ]; then
+    echo "❌ Error: .env file not found!"
+    echo "Please create a .env file from .env.example and configure your API keys"
+    exit 1
+fi
+
+# Source the .env file to check configuration (filter out problematic characters)
+export $(cat .env | grep -v '^#' | grep -v 'SERVER_NAME' | xargs)
+
+echo ""
+echo "📋 Configuration Status:"
+echo "------------------------"
+
+# Check which providers are configured
+if [ -n "$OPENAI_API_KEY" ] && [ "$OPENAI_API_KEY" != "your_openai_api_key_here" ]; then
+    echo "✅ OpenAI: Configured (Model: ${OPENAI_MODEL:-default})"
+else
+    echo "⚠️  OpenAI: Not configured"
+fi
+
+if [ -n "$GOOGLE_API_KEY" ] && [ "$GOOGLE_API_KEY" != "your_google_api_key_here" ]; then
+    echo "✅ Google: Configured (Model: ${GOOGLE_MODEL:-default})"
+else
+    echo "⚠️  Google: Not configured"
+fi
+
+if [ -n "$OLLAMA_ENDPOINT" ]; then
+    echo "✅ Ollama: Configured (Endpoint: $OLLAMA_ENDPOINT, Model: ${OLLAMA_MODEL:-default})"
+else
+    echo "⚠️  Ollama: Not configured"
+fi
+
+if [ -n "$MISTRAL_API_KEY" ] && [ "$MISTRAL_API_KEY" != "your_mistral_api_key_here" ]; then
+    echo "✅ Mistral: Configured (Model: ${MISTRAL_MODEL:-default})"
+else
+    echo "⚠️  Mistral: Not configured"
+fi
+
+echo ""
+echo "Default Provider: ${DEFAULT_PROVIDER:-openai}"
+echo ""
+
+# Run tests based on command line argument
+case "${1:-all}" in
+    "providers")
+        echo "🔌 Running Provider Connection Tests..."
+        echo "---------------------------------------"
+        go test -v ./llm -run TestProviderConnections -timeout 2m
+        ;;
+    "models")
+        echo "🤖 Running Model Variant Tests..."
+        echo "---------------------------------"
+        go test -v ./llm -run TestProviderModels -timeout 2m
+        ;;
+    "integration")
+        echo "🔧 Running Integration Tests..."
+        echo "-------------------------------"
+        go test -v . -run "Test(HandleGitDiff|HandleCodeReview|ProviderOverride|ModelOverride)" -timeout 3m
+        ;;
+    "quick")
+        echo "⚡ Running Quick Tests (no API calls)..."
+        echo "----------------------------------------"
+        go test -v ./llm -run TestAnalysisPrompts
+        go test -v ./llm -run TestEnvironmentVariables
+        ;;
+    "all")
+        echo "🎯 Running All Tests..."
+        echo "-----------------------"
+        
+        echo ""
+        echo "1️⃣ Quick Tests:"
+        go test -v ./llm -run "Test(AnalysisPrompts|EnvironmentVariables)" || true
+        
+        echo ""
+        echo "2️⃣ Provider Connections:"
+        go test -v ./llm -run TestProviderConnections -timeout 2m || true
+        
+        echo ""
+        echo "3️⃣ Model Variants:"
+        go test -v ./llm -run TestProviderModels -timeout 2m || true
+        
+        echo ""
+        echo "4️⃣ Integration Tests:"
+        go test -v . -run "Test(HandleGitDiff|HandleCodeReview|ProviderOverride|ModelOverride)" -timeout 3m || true
+        ;;
+    *)
+        echo "Usage: ./test.sh [providers|models|integration|quick|all]"
+        echo ""
+        echo "  providers    - Test connections to each LLM provider"
+        echo "  models       - Test different models for each provider"
+        echo "  integration  - Test tool handlers with real LLM calls"
+        echo "  quick        - Run tests that don't require API calls"
+        echo "  all          - Run all tests (default)"
+        exit 1
+        ;;
+esac
+
+echo ""
+echo "✅ Test run completed!"
