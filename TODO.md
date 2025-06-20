@@ -2,7 +2,7 @@
 
 ## Recently Completed ✅
 
-### High Priority Security & Stability Fixes (Completed)
+### Phase 1: High Priority Security & Stability Fixes (Completed)
 1. **Resource Leak - File Handle** - Added `defer f.Close()` in `config/config.go`
 2. **Race Condition - Global Map Access** - Added `sync.RWMutex` to protect `llmProviders` map
 3. **Missing HTTP Timeouts** - Added 30-second timeouts to all LLM provider HTTP clients
@@ -12,121 +12,174 @@
 7. **Config Type Assignment** - Fixed incorrect ".env" assignment to ".second-opinion.json"
 8. **Temperature Zero Override** - Fixed OpenAI provider to respect explicit temperature=0
 
+### Phase 2: Error Handling & Context Support (Completed)
+9. **Fixed Ignored Git Command Errors** - `getRepoInfo` now shows warnings for failures
+10. **Fixed Incomplete Error Handling** - `getCommitInfo` properly handles both command failures
+11. **Fixed Staged Changes Fallback** - Errors are now logged appropriately
+12. **Added Context Cancellation** - All git commands now use `exec.CommandContext`
+13. **Added Error Handling Tests** - Created `handlers_test.go` with comprehensive tests
+
 ## Outstanding Issues
 
-### Error Handling Issues (High Priority)
+### Performance Issues (High Priority)
 
-#### 1. Ignored Git Command Errors
-- **File**: `handlers.go`, Lines 191-203
-- **Issue**: All git command errors are ignored in `getRepoInfo()`
-- **Fix**: Add proper error handling and return meaningful messages
-
-#### 2. Incomplete Error Handling in Commit Diff
-- **File**: `handlers.go`, Lines 173-179
-- **Issue**: Second command error ignored when getting commit diff
-- **Fix**: Handle both command failures properly
-
-#### 3. Ignored Error in Staged Changes Fallback
-- **File**: `handlers.go`, Line 314
-- **Issue**: Error ignored when getting staged changes as fallback
-- **Fix**: Log or handle the error appropriately
-
-### Performance Issues (Medium Priority)
-
-#### 4. Memory Usage with Large Diffs
-- **File**: `handlers.go`, Line 181
+#### 1. Memory Usage with Large Diffs
+- **File**: `handlers.go`, Multiple locations
 - **Issue**: Large diffs loaded entirely into memory
-- **Fix**: Consider streaming large diffs or adding size limits
+- **Fix**: Implement streaming or size limits
+- **Impact**: Prevents OOM errors on large repositories
 
-#### 5. Missing Context Cancellation
-- **File**: All `exec.Command` calls
-- **Issue**: Commands don't respect context cancellation
-- **Fix**: Use `exec.CommandContext` instead of `exec.Command`
+#### 2. Add Progress Indicators
+- **Issue**: Long-running LLM calls have no feedback
+- **Fix**: Add progress callbacks or status updates
+- **Impact**: Better user experience
 
 ### Code Quality Issues (Medium Priority)
 
-#### 6. Missing Input Validation for Config
+#### 3. Missing Input Validation for Config
 - **File**: `config/config.go`, Lines 95-109
 - **Issue**: No validation for Temperature and MaxTokens ranges
-- **Fix**: Add bounds checking (e.g., Temperature: 0.0-2.0, MaxTokens: positive integer)
+- **Fix**: Add bounds checking (e.g., Temperature: 0.0-2.0, MaxTokens: 1-100000)
+
+#### 4. Improve Error Messages
+- **Issue**: Some errors lack context (which file, which operation)
+- **Fix**: Wrap errors with more descriptive messages
+- **Example**: Instead of "permission denied", show "cannot read /path/to/file: permission denied"
 
 ## Feature Enhancements
 
-### Reliability Improvements
+### Reliability Improvements (High Priority)
 
-#### 7. Add Retry Logic
+#### 5. Add Retry Logic with Exponential Backoff
 - **Files**: All LLM provider files
-- **Description**: Implement exponential backoff for transient API failures
+- **Implementation**:
+  - 3 retries with exponential backoff
+  - Handle rate limit errors (429) specifically
+  - Retry on network errors and 5xx status codes
+- **Priority**: High
+
+#### 6. Add Request/Response Logging
+- **Description**: Optional debug logging for API calls
+- **Implementation**: Log requests/responses when DEBUG env var is set
 - **Priority**: Medium
 
-#### 8. Add Rate Limiting
-- **Description**: Implement rate limiting per provider to avoid API limits
-- **Priority**: Medium
+### Performance Optimizations
 
-#### 9. Add Caching
-- **Description**: Cache analysis results for repeated queries
+#### 7. Add Connection Pooling
+- **Issue**: Each request creates new HTTP client
+- **Fix**: Reuse HTTP clients with connection pooling
+- **Impact**: Faster API calls, less overhead
+
+#### 8. Implement Caching Layer
+- **Description**: Cache analysis results with TTL
+- **Use cases**: 
+  - Same diff analyzed multiple times
+  - Repeated code reviews
 - **Priority**: Low
 
 ### Observability
 
-#### 10. Add Metrics and Monitoring
-- **Description**: Add prometheus metrics for API usage, errors, and performance
+#### 9. Add Metrics Collection
+- **Metrics to track**:
+  - API call latency by provider
+  - Error rates by type
+  - Token usage per request
+- **Implementation**: Prometheus metrics or StatsD
 - **Priority**: Medium
 
-#### 11. Structured Logging
-- **Description**: Replace log.Printf with structured logging (e.g., slog)
+#### 10. Structured Logging
+- **Current**: Using `log.Printf`
+- **Target**: Use `slog` for structured JSON logs
+- **Benefits**: Better log aggregation and searching
 - **Priority**: Low
 
-### Documentation
+### Testing Improvements
 
-#### 12. API Documentation
-- Create comprehensive API documentation for all tools
-- Document tool parameters and return values
-- Add usage examples
+#### 11. Add Integration Test Suite
+- **Coverage needed**:
+  - Git operations with test repos
+  - Mock LLM providers for predictable tests
+  - Error injection tests
+  - Concurrent request handling
 
-#### 13. Integration Examples
-- Add example configurations for each LLM provider
-- Create sample scripts showing tool usage
-- Document common workflows
+#### 12. Add Benchmarks
+- **Areas to benchmark**:
+  - Large diff processing
+  - Concurrent provider access
+  - Memory usage under load
 
-### Testing
-
-#### 14. Integration Tests
-- Test actual git operations with test repositories
-- Test LLM provider integrations with mock servers
-- Add tests for error scenarios
-
-#### 15. Benchmarks
-- Benchmark large diff handling
-- Benchmark concurrent provider access
-- Memory usage profiling
+#### 13. Add Fuzz Testing
+- **Target areas**:
+  - Input validation functions
+  - Git command construction
+  - Path handling
 
 ## New Features
 
-### 16. Additional Analysis Tools
-- `analyze_pull_request` - Analyze PR changes and provide feedback
-- `suggest_commit_message` - Generate commit messages from staged changes
-- `analyze_branch_diff` - Compare branches and summarize differences
+### 14. Additional Analysis Tools
+- **`analyze_pull_request`** - Full PR analysis with file-by-file breakdown
+- **`suggest_commit_message`** - AI-generated commit messages from changes
+- **`analyze_branch_diff`** - Compare and summarize branch differences
+- **`code_smell_detection`** - Identify problematic patterns
 
-### 17. Configuration Improvements
-- Support for `.second-opinion.yaml` config format
-- Per-project configuration overrides
-- Environment-specific provider selection
+### 15. Enhanced Configuration
+- **YAML Config Support** - Alternative to JSON
+- **Project-Specific Config** - `.second-opinion.yml` in repo root
+- **Provider Profiles** - Quick switching between configurations
+- **Config Validation CLI** - `second-opinion validate-config`
 
-### 18. Enhanced Security
-- Support for encrypted API keys in config
-- Audit logging for all operations
-- Sandboxed git command execution
+### 16. Security Enhancements
+- **Encrypted API Keys** - Store keys encrypted at rest
+- **Audit Logging** - Track all operations with user/timestamp
+- **Sandboxed Execution** - Run git commands in restricted environment
+- **Secret Scanning** - Prevent accidental secret commits
+
+### 17. Developer Experience
+- **CLI Mode** - Direct command-line usage without MCP
+- **Web UI** - Simple web interface for testing
+- **Plugin System** - Extensible analysis modules
+- **Custom Prompts** - User-defined analysis templates
+
+## Architecture Improvements
+
+### 18. Modular Provider System
+- **Current**: Providers hardcoded in main package
+- **Target**: Plugin-based provider loading
+- **Benefits**: Easier to add new providers
+
+### 19. Streaming Support
+- **Current**: All responses buffered
+- **Target**: Stream LLM responses as they arrive
+- **Benefits**: Faster perceived performance
+
+### 20. Multi-Model Support
+- **Feature**: Use different models for different tasks
+- **Example**: Fast model for diffs, powerful model for security review
 
 ---
 
-## Next Priority Order
+## Next Sprint Priority
 
-1. **Fix remaining error handling issues** (prevents silent failures)
-2. **Add context cancellation** (improves responsiveness)
-3. **Implement memory limits for large diffs** (prevents OOM)
-4. **Add config validation** (prevents invalid configurations)
-5. **Add retry logic** (improves reliability)
-6. **Create documentation** (improves usability)
-7. **Add integration tests** (ensures quality)
-8. **Implement new features** (extends functionality)
+### Sprint 1: Performance & Reliability (Current Focus)
+1. ✅ Fix all error handling issues
+2. ✅ Add context cancellation support
+3. **Memory limits for large diffs** (In Progress)
+4. **Add retry logic with backoff**
+5. **Connection pooling for HTTP clients**
+
+### Sprint 2: Developer Experience
+1. **Config validation and defaults**
+2. **Better error messages with context**
+3. **Progress indicators for long operations**
+4. **Debug logging mode**
+
+### Sprint 3: New Features
+1. **PR analysis tool**
+2. **Commit message generator**
+3. **Branch diff analyzer**
+
+### Sprint 4: Production Readiness
+1. **Metrics and monitoring**
+2. **Comprehensive test suite**
+3. **Performance benchmarks**
+4. **Documentation updates**
