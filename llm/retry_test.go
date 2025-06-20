@@ -198,8 +198,11 @@ func TestRetryableHTTPRequest_ExceedsMaxRetries(t *testing.T) {
 		BackoffMultiple: 2.0,
 	}
 
-	_, err := RetryableHTTPRequest(context.Background(), client, req, config)
+	resp, err := RetryableHTTPRequest(context.Background(), client, req, config)
 	if err == nil {
+		if resp != nil {
+			defer resp.Body.Close()
+		}
 		t.Fatal("Expected error after exceeding max retries")
 	}
 
@@ -260,8 +263,11 @@ func TestRetryableHTTPRequest_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
 
-	_, err := RetryableHTTPRequest(ctx, client, req, config)
+	resp, err := RetryableHTTPRequest(ctx, client, req, config)
 	if err == nil {
+		if resp != nil {
+			defer resp.Body.Close()
+		}
 		t.Fatal("Expected error due to context cancellation")
 	}
 
@@ -324,4 +330,3 @@ func TestRetryableOperation_NonRetryableError(t *testing.T) {
 		t.Errorf("Expected 1 attempt for non-retryable error, got %d", attempts)
 	}
 }
-

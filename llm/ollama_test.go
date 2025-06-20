@@ -17,13 +17,13 @@ func TestOllamaEndpointConnectivity(t *testing.T) {
 	if endpoint == "" {
 		endpoint = "http://localhost:11434"
 	}
-	
+
 	t.Logf("Testing connectivity to Ollama endpoint: %s", endpoint)
-	
+
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 	}
-	
+
 	// Test the base endpoint
 	resp, err := client.Get(endpoint)
 	if err != nil {
@@ -32,9 +32,9 @@ func TestOllamaEndpointConnectivity(t *testing.T) {
 		return
 	}
 	defer resp.Body.Close()
-	
+
 	t.Logf("Ollama endpoint response status: %d", resp.StatusCode)
-	
+
 	// Test the API endpoint
 	apiResp, err := client.Get(endpoint + "/api/tags")
 	if err != nil {
@@ -42,7 +42,7 @@ func TestOllamaEndpointConnectivity(t *testing.T) {
 		return
 	}
 	defer apiResp.Body.Close()
-	
+
 	if apiResp.StatusCode != http.StatusOK {
 		t.Errorf("Ollama API returned non-OK status: %d", apiResp.StatusCode)
 	}
@@ -54,36 +54,36 @@ func TestOllamaModelAvailability(t *testing.T) {
 	if endpoint == "" {
 		endpoint = "http://localhost:11434"
 	}
-	
+
 	model := os.Getenv("OLLAMA_MODEL")
 	if model == "" {
 		model = "llama3.2"
 	}
-	
+
 	t.Logf("Checking availability of model: %s", model)
-	
+
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	
+
 	resp, err := client.Get(endpoint + "/api/tags")
 	if err != nil {
 		t.Skipf("Cannot check models - Ollama not accessible: %v", err)
 		return
 	}
 	defer resp.Body.Close()
-	
+
 	var result struct {
 		Models []struct {
 			Name string `json:"name"`
 		} `json:"models"`
 	}
-	
+
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Errorf("Failed to parse models list: %v", err)
 		return
 	}
-	
+
 	modelFound := false
 	availableModels := []string{}
 	for _, m := range result.Models {
@@ -93,7 +93,7 @@ func TestOllamaModelAvailability(t *testing.T) {
 			t.Logf("Model %s is available", m.Name)
 		}
 	}
-	
+
 	if !modelFound {
 		t.Errorf("Model %s not found. Available models: %v", model, availableModels)
 	}
@@ -166,16 +166,16 @@ func TestOllamaProviderInitialization(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			provider, err := NewOllamaProvider(tt.config)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewOllamaProvider() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if err == nil {
 				if provider.endpoint != tt.expected.endpoint && tt.expected.endpoint != "" {
 					t.Errorf("Expected endpoint %s, got %s", tt.expected.endpoint, provider.endpoint)
@@ -196,35 +196,35 @@ func TestOllamaSimpleGeneration(t *testing.T) {
 	// Use env vars for real test
 	endpoint := os.Getenv("OLLAMA_ENDPOINT")
 	model := os.Getenv("OLLAMA_MODEL")
-	
+
 	if endpoint == "" || model == "" {
 		t.Skip("OLLAMA_ENDPOINT and OLLAMA_MODEL must be set for integration test")
 	}
-	
+
 	provider, err := NewOllamaProvider(Config{
 		Provider: "ollama",
 		Endpoint: endpoint,
 		Model:    model,
 	})
-	
+
 	if err != nil {
 		t.Fatalf("Failed to create provider: %v", err)
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	// Simple test prompt
 	result, err := provider.Analyze(ctx, "What is 2 + 2? Reply with just the number.")
-	
+
 	if err != nil {
 		t.Errorf("Ollama generation failed: %v", err)
 		t.Logf("Endpoint: %s, Model: %s", endpoint, model)
 		return
 	}
-	
+
 	t.Logf("Ollama response: %s", result)
-	
+
 	// Check if response contains "4"
 	if !strings.Contains(result, "4") {
 		t.Errorf("Expected response to contain '4', got: %s", result)
@@ -237,14 +237,14 @@ func TestOllamaWithRetry(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempts++
 		t.Logf("Request attempt %d to %s", attempts, r.URL.Path)
-		
+
 		if attempts < 2 {
 			// Simulate temporary failure
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(`{"error": "temporary failure"}`))
 			return
 		}
-		
+
 		// Successful response
 		response := map[string]interface{}{
 			"response": "Test successful after retry",
@@ -253,29 +253,29 @@ func TestOllamaWithRetry(t *testing.T) {
 		json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
-	
+
 	provider, err := NewOllamaProvider(Config{
 		Provider: "ollama",
 		Endpoint: server.URL,
 		Model:    "test-model",
 	})
-	
+
 	if err != nil {
 		t.Fatalf("Failed to create provider: %v", err)
 	}
-	
+
 	ctx := context.Background()
 	result, err := provider.Analyze(ctx, "test prompt")
-	
+
 	if err != nil {
 		t.Errorf("Expected successful retry, got error: %v", err)
 		return
 	}
-	
+
 	if result != "Test successful after retry" {
 		t.Errorf("Unexpected response: %s", result)
 	}
-	
+
 	if attempts != 2 {
 		t.Errorf("Expected 2 attempts, got %d", attempts)
 	}
@@ -289,27 +289,27 @@ func TestOllamaTimeout(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
-	
+
 	provider, err := NewOllamaProvider(Config{
 		Provider: "ollama",
 		Endpoint: server.URL,
 		Model:    "test-model",
 	})
-	
+
 	if err != nil {
 		t.Fatalf("Failed to create provider: %v", err)
 	}
-	
+
 	// Use a short timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	
+
 	_, err = provider.Analyze(ctx, "test prompt")
-	
+
 	if err == nil {
 		t.Error("Expected timeout error, got nil")
 	}
-	
+
 	if !strings.Contains(err.Error(), "context deadline exceeded") {
 		t.Errorf("Expected context deadline exceeded error, got: %v", err)
 	}
@@ -361,25 +361,25 @@ func TestOllamaErrorHandling(t *testing.T) {
 			expectedError: "", // Should succeed with empty response
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(tt.serverResponse))
 			defer server.Close()
-			
+
 			provider, err := NewOllamaProvider(Config{
 				Provider: "ollama",
 				Endpoint: server.URL,
 				Model:    "test-model",
 			})
-			
+
 			if err != nil {
 				t.Fatalf("Failed to create provider: %v", err)
 			}
-			
+
 			ctx := context.Background()
 			_, err = provider.Analyze(ctx, "test prompt")
-			
+
 			if tt.expectedError == "" {
 				if err != nil {
 					t.Errorf("Expected no error, got: %v", err)
@@ -404,18 +404,18 @@ func TestOllamaLargePrompt(t *testing.T) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		
+
 		prompt, ok := req["prompt"].(string)
 		if !ok {
 			t.Error("No prompt in request")
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		
+
 		if len(prompt) < 1000 {
 			t.Errorf("Expected large prompt, got %d characters", len(prompt))
 		}
-		
+
 		response := map[string]interface{}{
 			"response": "Processed large prompt successfully",
 			"done":     true,
@@ -423,28 +423,28 @@ func TestOllamaLargePrompt(t *testing.T) {
 		json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
-	
+
 	provider, err := NewOllamaProvider(Config{
 		Provider: "ollama",
 		Endpoint: server.URL,
 		Model:    "test-model",
 	})
-	
+
 	if err != nil {
 		t.Fatalf("Failed to create provider: %v", err)
 	}
-	
+
 	// Create a large prompt
 	largePrompt := strings.Repeat("This is a test sentence. ", 100)
-	
+
 	ctx := context.Background()
 	result, err := provider.Analyze(ctx, largePrompt)
-	
+
 	if err != nil {
 		t.Errorf("Failed to process large prompt: %v", err)
 		return
 	}
-	
+
 	if result != "Processed large prompt successfully" {
 		t.Errorf("Unexpected response: %s", result)
 	}
@@ -453,14 +453,14 @@ func TestOllamaLargePrompt(t *testing.T) {
 // TestOllamaRequestStructure tests that requests are properly formatted
 func TestOllamaRequestStructure(t *testing.T) {
 	var capturedRequest map[string]interface{}
-	
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&capturedRequest); err != nil {
 			t.Errorf("Failed to decode request: %v", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		
+
 		response := map[string]interface{}{
 			"response": "OK",
 			"done":     true,
@@ -468,39 +468,39 @@ func TestOllamaRequestStructure(t *testing.T) {
 		json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
-	
+
 	provider, err := NewOllamaProvider(Config{
 		Provider:    "ollama",
 		Endpoint:    server.URL,
 		Model:       "test-model",
 		Temperature: 0.7,
 	})
-	
+
 	if err != nil {
 		t.Fatalf("Failed to create provider: %v", err)
 	}
-	
+
 	ctx := context.Background()
 	_, err = provider.Analyze(ctx, "Test prompt")
-	
+
 	if err != nil {
 		t.Errorf("Request failed: %v", err)
 		return
 	}
-	
+
 	// Verify request structure
 	if capturedRequest["model"] != "test-model" {
 		t.Errorf("Expected model 'test-model', got %v", capturedRequest["model"])
 	}
-	
+
 	if capturedRequest["prompt"] != "Test prompt" {
 		t.Errorf("Expected prompt 'Test prompt', got %v", capturedRequest["prompt"])
 	}
-	
+
 	if capturedRequest["stream"] != false {
 		t.Errorf("Expected stream=false, got %v", capturedRequest["stream"])
 	}
-	
+
 	options, ok := capturedRequest["options"].(map[string]interface{})
 	if !ok {
 		t.Error("Expected options to be a map")
@@ -509,7 +509,7 @@ func TestOllamaRequestStructure(t *testing.T) {
 			t.Errorf("Expected temperature 0.7, got %v", options["temperature"])
 		}
 	}
-	
+
 	if capturedRequest["system"] == nil {
 		t.Error("Expected system prompt to be set")
 	}
@@ -520,28 +520,28 @@ func TestOllamaRealIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
-	
+
 	// Load from environment
 	endpoint := os.Getenv("OLLAMA_ENDPOINT")
 	model := os.Getenv("OLLAMA_MODEL")
-	
+
 	if endpoint == "" || model == "" {
 		t.Skip("OLLAMA_ENDPOINT and OLLAMA_MODEL must be set for integration test")
 	}
-	
+
 	t.Logf("Running integration test with endpoint: %s, model: %s", endpoint, model)
-	
+
 	provider, err := NewOllamaProvider(Config{
 		Provider:    "ollama",
 		Endpoint:    endpoint,
 		Model:       model,
 		Temperature: 0.3,
 	})
-	
+
 	if err != nil {
 		t.Fatalf("Failed to create provider: %v", err)
 	}
-	
+
 	// Test various prompts
 	testCases := []struct {
 		name   string
@@ -563,7 +563,7 @@ func TestOllamaRealIntegration(t *testing.T) {
 			},
 		},
 		{
-			name:   "git diff analysis",
+			name: "git diff analysis",
 			prompt: `Analyze this git diff and provide a one-line summary:
 diff --git a/test.js b/test.js
 index 123..456 100644
@@ -579,23 +579,23 @@ index 123..456 100644
 			},
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
-			
+
 			start := time.Now()
 			result, err := provider.Analyze(ctx, tc.prompt)
 			duration := time.Since(start)
-			
+
 			if err != nil {
 				t.Errorf("Analysis failed: %v", err)
 				return
 			}
-			
+
 			t.Logf("Response (in %v): %s", duration, result)
-			
+
 			if !tc.check(result) {
 				t.Errorf("Response validation failed for prompt: %s", tc.prompt)
 			}

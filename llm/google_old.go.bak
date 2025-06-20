@@ -52,8 +52,7 @@ func NewGoogleProvider(config Config) (*GoogleProvider, error) {
 
 // Analyze sends a prompt to Google AI and returns the response
 func (p *GoogleProvider) Analyze(ctx context.Context, prompt string) (string, error) {
-	// SECURITY FIX: Remove API key from URL
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", p.model)
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", p.model, p.apiKey)
 
 	requestBody := map[string]any{
 		"contents": []map[string]any{
@@ -72,22 +71,6 @@ func (p *GoogleProvider) Analyze(ctx context.Context, prompt string) (string, er
 				},
 			},
 		},
-		"generationConfig": map[string]any{
-			"temperature":     p.temperature,
-			"maxOutputTokens": p.maxTokens,
-			"topK":            40,
-			"topP":            0.95,
-		},
-		"safetySettings": []map[string]string{
-			{
-				"category":  "HARM_CATEGORY_HATE_SPEECH",
-				"threshold": "BLOCK_ONLY_HIGH",
-			},
-			{
-				"category":  "HARM_CATEGORY_DANGEROUS_CONTENT",
-				"threshold": "BLOCK_ONLY_HIGH",
-			},
-		},
 	}
 
 	jsonBody, err := json.Marshal(requestBody)
@@ -101,8 +84,6 @@ func (p *GoogleProvider) Analyze(ctx context.Context, prompt string) (string, er
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	// SECURITY FIX: Use header for API key instead of URL parameter
-	req.Header.Set("x-goog-api-key", p.apiKey)
 
 	resp, err := RetryableHTTPRequest(ctx, p.httpClient, req, p.retryConfig)
 	if err != nil {
@@ -134,35 +115,15 @@ func (p *GoogleProvider) Analyze(ctx context.Context, prompt string) (string, er
 					Text string `json:"text"`
 				} `json:"parts"`
 			} `json:"content"`
-			FinishReason  string `json:"finishReason"`
-			SafetyRatings []any  `json:"safetyRatings"`
 		} `json:"candidates"`
-		PromptFeedback struct {
-			BlockReason string `json:"blockReason"`
-		} `json:"promptFeedback"`
-		UsageMetadata struct {
-			PromptTokenCount     int `json:"promptTokenCount"`
-			CandidatesTokenCount int `json:"candidatesTokenCount"`
-			TotalTokenCount      int `json:"totalTokenCount"`
-		} `json:"usageMetadata"`
 	}
 
 	if err := json.Unmarshal(body, &result); err != nil {
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	// Check for blocked prompts
-	if result.PromptFeedback.BlockReason != "" {
-		return "", fmt.Errorf("prompt blocked: %s", result.PromptFeedback.BlockReason)
-	}
-
 	if len(result.Candidates) == 0 || len(result.Candidates[0].Content.Parts) == 0 {
 		return "", fmt.Errorf("no response from Google AI")
-	}
-
-	// Check finish reason
-	if result.Candidates[0].FinishReason == "SAFETY" {
-		return "", fmt.Errorf("response blocked due to safety settings")
 	}
 
 	return result.Candidates[0].Content.Parts[0].Text, nil

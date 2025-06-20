@@ -9,6 +9,11 @@ import (
 	"net/http"
 )
 
+const (
+	defaultOllamaEndpoint = "http://localhost:11434"
+	defaultOllamaModel    = "llama3.2"
+)
+
 // OllamaProvider implements the Provider interface for Ollama
 type OllamaProvider struct {
 	endpoint    string
@@ -22,12 +27,12 @@ type OllamaProvider struct {
 func NewOllamaProvider(config Config) (*OllamaProvider, error) {
 	endpoint := config.Endpoint
 	if endpoint == "" {
-		endpoint = "http://localhost:11434"
+		endpoint = defaultOllamaEndpoint
 	}
 
 	model := config.Model
 	if model == "" {
-		model = "llama3.2"
+		model = defaultOllamaModel
 	}
 
 	temperature := config.Temperature

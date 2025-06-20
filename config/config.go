@@ -190,8 +190,12 @@ func (c *Config) GetProviderConfig(provider string) (apiKey, model, endpoint str
 	case "mistral":
 		return c.Mistral.APIKey, c.Mistral.Model, ""
 	default:
-		// Return config for default provider
-		return c.GetProviderConfig(c.DefaultProvider)
+		// Return config for default provider if different from requested
+		if provider != c.DefaultProvider && c.DefaultProvider != "" {
+			return c.GetProviderConfig(c.DefaultProvider)
+		}
+		// Return empty values if provider not found
+		return "", "", ""
 	}
 }
 
