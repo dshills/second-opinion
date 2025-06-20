@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/dshills/second-opinion/config"
 	"github.com/dshills/second-opinion/llm"
@@ -11,8 +12,9 @@ import (
 )
 
 var (
-	cfg          *config.Config
-	llmProviders = make(map[string]llm.Provider)
+	cfg             *config.Config
+	llmProviders    = make(map[string]llm.Provider)
+	llmProvidersMux sync.RWMutex
 )
 
 func main() {
@@ -54,7 +56,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize default LLM provider: %v", err)
 	}
+
+	llmProvidersMux.Lock()
 	llmProviders[cfg.DefaultProvider] = defaultProvider
+	llmProvidersMux.Unlock()
 
 	s := server.NewMCPServer(
 		cfg.ServerName,
@@ -171,9 +176,12 @@ func getOrCreateProvider(providerName, modelOverride string) (llm.Provider, erro
 	}
 
 	// Check if we already have this provider configured
+	llmProvidersMux.RLock()
 	if provider, exists := llmProviders[cacheKey]; exists {
+		llmProvidersMux.RUnlock()
 		return provider, nil
 	}
+	llmProvidersMux.RUnlock()
 
 	// Get provider configuration
 	apiKey, model, endpoint := cfg.GetProviderConfig(providerName)
@@ -198,7 +206,9 @@ func getOrCreateProvider(providerName, modelOverride string) (llm.Provider, erro
 		return nil, fmt.Errorf("failed to create %s provider: %w", providerName, err)
 	}
 
-	// Cache the provider
+	// Cache the provider with write lock
+	llmProvidersMux.Lock()
 	llmProviders[cacheKey] = provider
+	llmProvidersMux.Unlock()
 	return provider, nil
 }

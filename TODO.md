@@ -1,133 +1,132 @@
 # TODO - Second Opinion MCP Server
 
-## Critical Issues (High Priority)
+## Recently Completed ✅
 
-### 1. Resource Leak - File Handle Not Closed
-- **File**: `config/config.go`, Line 61
-- **Issue**: File handle `f` is never closed when reading config
-- **Fix**: Add `defer f.Close()` after `os.Open()`
+### High Priority Security & Stability Fixes (Completed)
+1. **Resource Leak - File Handle** - Added `defer f.Close()` in `config/config.go`
+2. **Race Condition - Global Map Access** - Added `sync.RWMutex` to protect `llmProviders` map
+3. **Missing HTTP Timeouts** - Added 30-second timeouts to all LLM provider HTTP clients
+4. **Command Injection Prevention** - Added `validation.go` with secure path and SHA validation
+5. **API Key Security** - Google provider now redacts sensitive info from error messages
+6. **HTTP Response Body Handling** - Added proper body draining before closing connections
+7. **Config Type Assignment** - Fixed incorrect ".env" assignment to ".second-opinion.json"
+8. **Temperature Zero Override** - Fixed OpenAI provider to respect explicit temperature=0
 
-### 2. Race Condition - Global Map Access
-- **File**: `main.go`, Line 15
-- **Issue**: Global `llmProviders` map accessed by multiple goroutines without synchronization
-- **Fix**: Use `sync.RWMutex` or `sync.Map` for thread-safe access
+## Outstanding Issues
 
-### 3. Missing HTTP Timeouts
-- **Files**: All files in `llm/` directory (openai.go, google.go, ollama.go, mistral.go)
-- **Issue**: HTTP clients have no timeout configuration
-- **Fix**: Add timeout to HTTP client initialization
+### Error Handling Issues (High Priority)
 
-## Security Issues (High Priority)
-
-### 4. Potential Command Injection
-- **File**: `handlers.go`, multiple locations
-- **Issue**: User-provided `repoPath` and `commitSHA` used in exec.Command without validation
-- **Fix**: Validate inputs and use `filepath.Clean()` on paths
-
-### 5. API Key Exposure Risk
-- **File**: `llm/google.go`, Line 51
-- **Issue**: API keys included in URLs could be exposed in logs
-- **Fix**: Ensure keys are not logged in error messages
-
-## Error Handling Issues (Medium Priority)
-
-### 6. Ignored Git Command Errors
+#### 1. Ignored Git Command Errors
 - **File**: `handlers.go`, Lines 191-203
 - **Issue**: All git command errors are ignored in `getRepoInfo()`
 - **Fix**: Add proper error handling and return meaningful messages
 
-### 7. Incomplete Error Handling in Commit Diff
+#### 2. Incomplete Error Handling in Commit Diff
 - **File**: `handlers.go`, Lines 173-179
 - **Issue**: Second command error ignored when getting commit diff
 - **Fix**: Handle both command failures properly
 
-### 8. Ignored Error in Staged Changes Fallback
+#### 3. Ignored Error in Staged Changes Fallback
 - **File**: `handlers.go`, Line 314
 - **Issue**: Error ignored when getting staged changes as fallback
 - **Fix**: Log or handle the error appropriately
 
-## Performance Issues (Medium Priority)
+### Performance Issues (Medium Priority)
 
-### 9. Memory Usage with Large Diffs
+#### 4. Memory Usage with Large Diffs
 - **File**: `handlers.go`, Line 181
 - **Issue**: Large diffs loaded entirely into memory
 - **Fix**: Consider streaming large diffs or adding size limits
 
-### 10. Missing Context Cancellation
+#### 5. Missing Context Cancellation
 - **File**: All `exec.Command` calls
 - **Issue**: Commands don't respect context cancellation
 - **Fix**: Use `exec.CommandContext` instead of `exec.Command`
 
-## Code Quality Issues (Low Priority)
+### Code Quality Issues (Medium Priority)
 
-### 11. HTTP Response Body Handling
-- **Files**: All LLM provider files
-- **Issue**: Response bodies not drained before closing
-- **Fix**: Add `io.Copy(io.Discard, resp.Body)` before close
-
-### 12. Incorrect Config Type Assignment
-- **File**: `config/config.go`, Line 62
-- **Issue**: ConfigType set to ".env" instead of ".second-opinion.json"
-- **Fix**: Remove or correct the assignment
-
-### 13. Temperature Zero Override
-- **File**: `llm/openai.go`, Lines 35-38
-- **Issue**: Valid temperature of 0 gets overridden to 0.3
-- **Fix**: Only set default if temperature is not explicitly set
-
-### 14. Missing Input Validation
+#### 6. Missing Input Validation for Config
 - **File**: `config/config.go`, Lines 95-109
 - **Issue**: No validation for Temperature and MaxTokens ranges
-- **Fix**: Add bounds checking for configuration values
+- **Fix**: Add bounds checking (e.g., Temperature: 0.0-2.0, MaxTokens: positive integer)
 
 ## Feature Enhancements
 
-### 15. Add Retry Logic
+### Reliability Improvements
+
+#### 7. Add Retry Logic
 - **Files**: All LLM provider files
-- **Issue**: No retry logic for transient failures
-- **Fix**: Implement exponential backoff for API calls
+- **Description**: Implement exponential backoff for transient API failures
+- **Priority**: Medium
 
-### 16. Add Metrics and Monitoring
-- **Issue**: No metrics for API usage, errors, or performance
-- **Fix**: Add prometheus metrics or logging
+#### 8. Add Rate Limiting
+- **Description**: Implement rate limiting per provider to avoid API limits
+- **Priority**: Medium
 
-### 17. Add Rate Limiting
-- **Issue**: No rate limiting for API calls
-- **Fix**: Implement rate limiting per provider
+#### 9. Add Caching
+- **Description**: Cache analysis results for repeated queries
+- **Priority**: Low
 
-### 18. Add Caching
-- **Issue**: No caching of analysis results
-- **Fix**: Add optional caching layer for repeated analyses
+### Observability
 
-## Documentation
+#### 10. Add Metrics and Monitoring
+- **Description**: Add prometheus metrics for API usage, errors, and performance
+- **Priority**: Medium
 
-### 19. Add API Documentation
+#### 11. Structured Logging
+- **Description**: Replace log.Printf with structured logging (e.g., slog)
+- **Priority**: Low
+
+### Documentation
+
+#### 12. API Documentation
 - Create comprehensive API documentation for all tools
+- Document tool parameters and return values
+- Add usage examples
 
-### 20. Add Examples
-- Add example usage for each tool
-- Create integration examples
+#### 13. Integration Examples
+- Add example configurations for each LLM provider
+- Create sample scripts showing tool usage
+- Document common workflows
 
-## Testing
+### Testing
 
-### 21. Add Integration Tests
-- Test actual git operations
-- Test LLM provider integrations
+#### 14. Integration Tests
+- Test actual git operations with test repositories
+- Test LLM provider integrations with mock servers
+- Add tests for error scenarios
 
-### 22. Add Benchmarks
+#### 15. Benchmarks
 - Benchmark large diff handling
 - Benchmark concurrent provider access
+- Memory usage profiling
+
+## New Features
+
+### 16. Additional Analysis Tools
+- `analyze_pull_request` - Analyze PR changes and provide feedback
+- `suggest_commit_message` - Generate commit messages from staged changes
+- `analyze_branch_diff` - Compare branches and summarize differences
+
+### 17. Configuration Improvements
+- Support for `.second-opinion.yaml` config format
+- Per-project configuration overrides
+- Environment-specific provider selection
+
+### 18. Enhanced Security
+- Support for encrypted API keys in config
+- Audit logging for all operations
+- Sandboxed git command execution
 
 ---
 
-## Priority Order
+## Next Priority Order
 
-1. Fix resource leak (config file handle)
-2. Fix race condition (llmProviders map)
-3. Add HTTP timeouts
-4. Validate command inputs
-5. Improve error handling
-6. Add context cancellation
-7. Optimize memory usage
-8. Improve code quality
-9. Add features and documentation
+1. **Fix remaining error handling issues** (prevents silent failures)
+2. **Add context cancellation** (improves responsiveness)
+3. **Implement memory limits for large diffs** (prevents OOM)
+4. **Add config validation** (prevents invalid configurations)
+5. **Add retry logic** (improves reliability)
+6. **Create documentation** (improves usability)
+7. **Add integration tests** (ensures quality)
+8. **Implement new features** (extends functionality)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 const (
@@ -33,7 +34,8 @@ func NewOpenAIProvider(config Config) (*OpenAIProvider, error) {
 	}
 
 	temperature := config.Temperature
-	if temperature == 0 {
+	// Only set default if temperature wasn't explicitly set in config
+	if temperature == 0 && config.Temperature == 0 {
 		temperature = 0.3
 	}
 
@@ -79,12 +81,17 @@ func (p *OpenAIProvider) Analyze(ctx context.Context, prompt string) (string, er
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+p.apiKey)
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

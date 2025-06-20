@@ -59,7 +59,9 @@ func loadFromHome() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	conf := Config{ConfigType: ".env"}
+	defer f.Close()
+
+	conf := Config{ConfigType: ".second-opinion.json"}
 	err = json.NewDecoder(f).Decode(&conf)
 	return &conf, err
 }

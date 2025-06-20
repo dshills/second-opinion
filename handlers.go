@@ -106,7 +106,13 @@ func handleRepoInfo(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		repoPath = path
 	}
 
-	info := getRepoInfo(repoPath)
+	// Validate repo path
+	validPath, err := validateRepoPath(repoPath)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Invalid repository path: %v", err)), nil
+	}
+
+	info := getRepoInfo(validPath)
 
 	return mcp.NewToolResultText(info), nil
 }
@@ -117,9 +123,20 @@ func handleCommitAnalysis(ctx context.Context, request mcp.CallToolRequest) (*mc
 		commitSHA = sha
 	}
 
+	// Validate commit SHA
+	if err := validateCommitSHA(commitSHA); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Invalid commit SHA: %v", err)), nil
+	}
+
 	repoPath := "."
 	if path, ok := request.GetArguments()["repo_path"].(string); ok && path != "" {
 		repoPath = path
+	}
+
+	// Validate repo path
+	validPath, err := validateRepoPath(repoPath)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Invalid repository path: %v", err)), nil
 	}
 
 	// Get provider and model from request
@@ -140,7 +157,7 @@ func handleCommitAnalysis(ctx context.Context, request mcp.CallToolRequest) (*mc
 	}
 
 	// Get commit information
-	commitInfo, err := getCommitInfo(repoPath, commitSHA)
+	commitInfo, err := getCommitInfo(validPath, commitSHA)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -222,6 +239,12 @@ func handleAnalyzeUncommittedWork(ctx context.Context, request mcp.CallToolReque
 		repoPath = path
 	}
 
+	// Validate repo path
+	validPath, err := validateRepoPath(repoPath)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Invalid repository path: %v", err)), nil
+	}
+
 	stagedOnly := false
 	if staged, ok := request.GetArguments()["staged_only"].(bool); ok {
 		stagedOnly = staged
@@ -245,7 +268,7 @@ func handleAnalyzeUncommittedWork(ctx context.Context, request mcp.CallToolReque
 	}
 
 	// Get uncommitted changes
-	diffContent, err := getUncommittedChanges(repoPath, stagedOnly)
+	diffContent, err := getUncommittedChanges(validPath, stagedOnly)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}

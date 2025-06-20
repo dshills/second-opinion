@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 // GoogleProvider implements the Provider interface for Google AI (Gemini)
@@ -81,12 +82,17 @@ func (p *GoogleProvider) Analyze(ctx context.Context, prompt string) (string, er
 
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -94,7 +100,12 @@ func (p *GoogleProvider) Analyze(ctx context.Context, prompt string) (string, er
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("the Google AI API error (status %d): %s", resp.StatusCode, string(body))
+		// Redact API key from error message if present
+		errMsg := string(body)
+		if p.apiKey != "" && len(p.apiKey) > 8 {
+			errMsg = fmt.Sprintf("Google AI API error (status %d): [response body redacted for security]", resp.StatusCode)
+		}
+		return "", fmt.Errorf("%s", errMsg)
 	}
 
 	var result struct {
