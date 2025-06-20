@@ -3,6 +3,7 @@ package llm_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -87,7 +88,7 @@ func TestProviderConnections(t *testing.T) {
 
 			provider, err := llm.NewProvider(providerConfig)
 			if err != nil {
-				t.Fatalf("Failed to create %s provider: %v", tc.provider, err)
+				t.Fatalf("[Provider: %s, Model: %s] Failed to create provider: %v", tc.provider, model, err)
 			}
 
 			// Create context with timeout
@@ -98,7 +99,7 @@ func TestProviderConnections(t *testing.T) {
 			prompt := "Analyze this code snippet: func main() { fmt.Println(\"test\") }"
 			response, err := provider.Analyze(ctx, prompt)
 			if err != nil {
-				fmt.Printf("Error analyzing with %s: %v\n", tc.provider, err)
+				t.Errorf("[Provider: %s, Model: %s] Error analyzing: %v", tc.provider, model, err)
 				return
 			}
 			fmt.Printf("%s response: %s\n", tc.provider, response)
@@ -107,7 +108,6 @@ func TestProviderConnections(t *testing.T) {
 	}
 }
 
-/*
 // TestProviderModels tests different models for each provider
 func TestProviderModels(t *testing.T) {
 	cfg, err := config.Load()
@@ -130,7 +130,7 @@ func TestProviderModels(t *testing.T) {
 		},
 		{
 			provider: "google",
-			models:   []string{"gemini-1.5-flash", "gemini-1.5-pro"},
+			models:   []string{"gemini-2.0-flash-exp", "gemini-1.5-pro"},
 			skipIf: func() bool {
 				return cfg.Google.APIKey == "" || cfg.Google.APIKey == "your_google_api_key_here"
 			},
@@ -160,7 +160,7 @@ func TestProviderModels(t *testing.T) {
 
 					provider, err := llm.NewProvider(providerConfig)
 					if err != nil {
-						t.Fatalf("Failed to create provider with model %s: %v", model, err)
+						t.Fatalf("[Provider: %s, Model: %s] Failed to create provider: %v", test.provider, model, err)
 					}
 
 					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -174,18 +174,18 @@ func TestProviderModels(t *testing.T) {
 						if strings.Contains(err.Error(), "model_not_found") ||
 							strings.Contains(err.Error(), "Your organization must be verified") ||
 							strings.Contains(err.Error(), "is not found for API version") {
-							t.Skipf("Model %s not available: %v", model, err)
+							t.Skipf("[Provider: %s, Model: %s] Model not available: %v", test.provider, model, err)
 							return
 						}
-						t.Fatalf("Analysis failed with model %s: %v", model, err)
+						t.Fatalf("[Provider: %s, Model: %s] Analysis failed: %v", test.provider, model, err)
 					}
 
 					// Check response contains "4"
 					if !strings.Contains(response, "4") {
-						t.Errorf("Model %s didn't return expected answer: %s", model, response)
+						t.Errorf("[Provider: %s, Model: %s] Didn't return expected answer: %s", test.provider, model, response)
 					}
 
-					t.Logf("%s/%s response: %s", test.provider, model, response)
+					t.Logf("[Provider: %s, Model: %s] Response: %s", test.provider, model, response)
 				})
 			}
 		})
@@ -266,4 +266,3 @@ func TestEnvironmentVariables(t *testing.T) {
 		}
 	})
 }
-*/

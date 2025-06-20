@@ -71,7 +71,7 @@ test-models:
 ## test-integration: Run integration tests
 test-integration:
 	@echo "Running integration tests..."
-	@go test . -timeout 120s -coverprofile=coverage.out 2>&1 | \
+	@go test . -timeout 180s -coverprofile=coverage.out 2>&1 | \
 		grep -E "(FAIL:|Error:|panic:|--- FAIL|PASS.*coverage)" || echo "✅ All tests passed"
 	@go tool cover -func=coverage.out 2>/dev/null | grep total | awk '{print "Coverage: " $$3}' || true
 

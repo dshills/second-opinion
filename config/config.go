@@ -117,10 +117,10 @@ func loadEnv() (*Config, error) {
 	cfg.OpenAI.Model = getEnv("OPENAI_MODEL", "gpt-4o-mini")
 
 	cfg.Google.APIKey = getEnv("GOOGLE_API_KEY", "")
-	cfg.Google.Model = getEnv("GOOGLE_MODEL", "gemini-1.5-flash")
+	cfg.Google.Model = getEnv("GOOGLE_MODEL", "gemini-2.0-flash-exp")
 
 	cfg.Ollama.Endpoint = getEnv("OLLAMA_ENDPOINT", "http://localhost:11434")
-	cfg.Ollama.Model = getEnv("OLLAMA_MODEL", "llama3.2")
+	cfg.Ollama.Model = getEnv("OLLAMA_MODEL", "devstral:latest")
 
 	cfg.Mistral.APIKey = getEnv("MISTRAL_API_KEY", "")
 	cfg.Mistral.Model = getEnv("MISTRAL_MODEL", "mistral-small-latest")

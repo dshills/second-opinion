@@ -27,7 +27,7 @@ func NewGoogleProvider(config Config) (*GoogleProvider, error) {
 
 	model := config.Model
 	if model == "" {
-		model = "gemini-1.5-flash"
+		model = "gemini-2.0-flash-exp"
 	}
 
 	temperature := config.Temperature

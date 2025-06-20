@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 const (
@@ -55,6 +56,17 @@ func NewOpenAIProvider(config Config) (*OpenAIProvider, error) {
 	}, nil
 }
 
+// isNewGenerationModel checks if the model is o3/o4 series that requires max_completion_tokens and has temperature restrictions
+func (p *OpenAIProvider) isNewGenerationModel() bool {
+	modelLower := strings.ToLower(p.model)
+	return strings.Contains(modelLower, "o3") || strings.Contains(modelLower, "o4")
+}
+
+// supportsCustomTemperature checks if the model supports custom temperature values
+func (p *OpenAIProvider) supportsCustomTemperature() bool {
+	return !p.isNewGenerationModel() // o3/o4 models only support default temperature of 1.0
+}
+
 // Analyze sends a prompt to OpenAI and returns the response
 func (p *OpenAIProvider) Analyze(ctx context.Context, prompt string) (string, error) {
 	requestBody := map[string]any{
@@ -69,8 +81,19 @@ func (p *OpenAIProvider) Analyze(ctx context.Context, prompt string) (string, er
 				"content": prompt,
 			},
 		},
-		"temperature": p.temperature,
-		"max_tokens":  p.maxTokens,
+	}
+
+	// Set temperature only for models that support custom values
+	if p.supportsCustomTemperature() {
+		requestBody["temperature"] = p.temperature
+	}
+	// o3/o4 models use default temperature of 1.0 (no need to set explicitly)
+
+	// Use max_completion_tokens for o3/o4 models, max_tokens for others
+	if p.isNewGenerationModel() {
+		requestBody["max_completion_tokens"] = p.maxTokens
+	} else {
+		requestBody["max_tokens"] = p.maxTokens
 	}
 
 	jsonBody, err := json.Marshal(requestBody)

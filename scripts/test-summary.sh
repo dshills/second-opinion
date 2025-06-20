@@ -73,7 +73,7 @@ case $TEST_MODE in
         run_test_suite "Unit Tests" "./llm" "TestAnalysisPrompts|TestEnvironmentVariables" "10s"
         run_test_suite "Provider Tests" "./llm" "TestProviderConnections" "30s"
         run_test_suite "Model Tests" "./llm" "TestProviderModels" "60s"
-        run_test_suite "Integration Tests" "." "" "120s"
+        run_test_suite "Integration Tests" "." "" "180s"
         ;;
     
     *)

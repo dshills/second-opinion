@@ -24,10 +24,15 @@ func TestOllamaEndpointConnectivity(t *testing.T) {
 		Timeout: 5 * time.Second,
 	}
 
+	model := os.Getenv("OLLAMA_MODEL")
+	if model == "" {
+		model = "devstral:latest"
+	}
+
 	// Test the base endpoint
 	resp, err := client.Get(endpoint)
 	if err != nil {
-		t.Errorf("Failed to connect to Ollama endpoint: %v", err)
+		t.Errorf("[Provider: ollama, Model: %s] Failed to connect to endpoint: %v", model, err)
 		t.Logf("Make sure Ollama is running at %s", endpoint)
 		return
 	}
@@ -38,13 +43,13 @@ func TestOllamaEndpointConnectivity(t *testing.T) {
 	// Test the API endpoint
 	apiResp, err := client.Get(endpoint + "/api/tags")
 	if err != nil {
-		t.Errorf("Failed to connect to Ollama API endpoint: %v", err)
+		t.Errorf("[Provider: ollama, Model: %s] Failed to connect to API endpoint: %v", model, err)
 		return
 	}
 	defer apiResp.Body.Close()
 
 	if apiResp.StatusCode != http.StatusOK {
-		t.Errorf("Ollama API returned non-OK status: %d", apiResp.StatusCode)
+		t.Errorf("[Provider: ollama, Model: %s] API returned non-OK status: %d", model, apiResp.StatusCode)
 	}
 }
 
@@ -57,7 +62,7 @@ func TestOllamaModelAvailability(t *testing.T) {
 
 	model := os.Getenv("OLLAMA_MODEL")
 	if model == "" {
-		model = "llama3.2"
+		model = "devstral:latest"
 	}
 
 	t.Logf("Checking availability of model: %s", model)
@@ -80,7 +85,7 @@ func TestOllamaModelAvailability(t *testing.T) {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Errorf("Failed to parse models list: %v", err)
+		t.Errorf("[Provider: ollama, Model: %s] Failed to parse models list: %v", model, err)
 		return
 	}
 
@@ -95,7 +100,7 @@ func TestOllamaModelAvailability(t *testing.T) {
 	}
 
 	if !modelFound {
-		t.Errorf("Model %s not found. Available models: %v", model, availableModels)
+		t.Errorf("[Provider: ollama, Model: %s] Model not found. Available models: %v", model, availableModels)
 	}
 }
 
@@ -123,7 +128,7 @@ func TestOllamaProviderInitialization(t *testing.T) {
 				temp     float64
 			}{
 				endpoint: "http://localhost:11434",
-				model:    "llama3.2",
+				model:    "devstral:latest",
 				temp:     0.3,
 			},
 		},
@@ -172,19 +177,19 @@ func TestOllamaProviderInitialization(t *testing.T) {
 			provider, err := NewOllamaProvider(tt.config)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewOllamaProvider() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("[Provider: ollama, Model: %s] NewOllamaProvider() error = %v, wantErr %v", tt.config.Model, err, tt.wantErr)
 				return
 			}
 
 			if err == nil {
 				if provider.endpoint != tt.expected.endpoint && tt.expected.endpoint != "" {
-					t.Errorf("Expected endpoint %s, got %s", tt.expected.endpoint, provider.endpoint)
+					t.Errorf("[Provider: ollama, Model: %s] Expected endpoint %s, got %s", tt.config.Model, tt.expected.endpoint, provider.endpoint)
 				}
 				if provider.model != tt.expected.model && tt.expected.model != "" {
-					t.Errorf("Expected model %s, got %s", tt.expected.model, provider.model)
+					t.Errorf("[Provider: ollama, Model: %s] Expected model %s, got %s", tt.config.Model, tt.expected.model, provider.model)
 				}
 				if provider.temperature != tt.expected.temp {
-					t.Errorf("Expected temperature %f, got %f", tt.expected.temp, provider.temperature)
+					t.Errorf("[Provider: ollama, Model: %s] Expected temperature %f, got %f", tt.config.Model, tt.expected.temp, provider.temperature)
 				}
 			}
 		})
@@ -208,7 +213,7 @@ func TestOllamaSimpleGeneration(t *testing.T) {
 	})
 
 	if err != nil {
-		t.Fatalf("Failed to create provider: %v", err)
+		t.Fatalf("[Provider: ollama, Model: %s] Failed to create provider: %v", model, err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -218,7 +223,7 @@ func TestOllamaSimpleGeneration(t *testing.T) {
 	result, err := provider.Analyze(ctx, "What is 2 + 2? Reply with just the number.")
 
 	if err != nil {
-		t.Errorf("Ollama generation failed: %v", err)
+		t.Errorf("[Provider: ollama, Model: %s] Generation failed: %v", model, err)
 		t.Logf("Endpoint: %s, Model: %s", endpoint, model)
 		return
 	}
@@ -227,7 +232,7 @@ func TestOllamaSimpleGeneration(t *testing.T) {
 
 	// Check if response contains "4"
 	if !strings.Contains(result, "4") {
-		t.Errorf("Expected response to contain '4', got: %s", result)
+		t.Errorf("[Provider: ollama, Model: %s] Expected response to contain '4', got: %s", model, result)
 	}
 }
 
@@ -261,23 +266,23 @@ func TestOllamaWithRetry(t *testing.T) {
 	})
 
 	if err != nil {
-		t.Fatalf("Failed to create provider: %v", err)
+		t.Fatalf("[Provider: ollama, Model: test-model] Failed to create provider: %v", err)
 	}
 
 	ctx := context.Background()
 	result, err := provider.Analyze(ctx, "test prompt")
 
 	if err != nil {
-		t.Errorf("Expected successful retry, got error: %v", err)
+		t.Errorf("[Provider: ollama, Model: test-model] Expected successful retry, got error: %v", err)
 		return
 	}
 
 	if result != "Test successful after retry" {
-		t.Errorf("Unexpected response: %s", result)
+		t.Errorf("[Provider: ollama, Model: test-model] Unexpected response: %s", result)
 	}
 
 	if attempts != 2 {
-		t.Errorf("Expected 2 attempts, got %d", attempts)
+		t.Errorf("[Provider: ollama, Model: test-model] Expected 2 attempts, got %d", attempts)
 	}
 }
 
@@ -297,7 +302,7 @@ func TestOllamaTimeout(t *testing.T) {
 	})
 
 	if err != nil {
-		t.Fatalf("Failed to create provider: %v", err)
+		t.Fatalf("[Provider: ollama, Model: test-model] Failed to create provider: %v", err)
 	}
 
 	// Use a short timeout
@@ -307,11 +312,11 @@ func TestOllamaTimeout(t *testing.T) {
 	_, err = provider.Analyze(ctx, "test prompt")
 
 	if err == nil {
-		t.Error("Expected timeout error, got nil")
+		t.Error("[Provider: ollama, Model: test-model] Expected timeout error, got nil")
 	}
 
 	if !strings.Contains(err.Error(), "context deadline exceeded") {
-		t.Errorf("Expected context deadline exceeded error, got: %v", err)
+		t.Errorf("[Provider: ollama, Model: test-model] Expected context deadline exceeded error, got: %v", err)
 	}
 }
 
@@ -374,7 +379,7 @@ func TestOllamaErrorHandling(t *testing.T) {
 			})
 
 			if err != nil {
-				t.Fatalf("Failed to create provider: %v", err)
+				t.Fatalf("[Provider: ollama, Model: test-model] Failed to create provider: %v", err)
 			}
 
 			ctx := context.Background()
@@ -382,13 +387,13 @@ func TestOllamaErrorHandling(t *testing.T) {
 
 			if tt.expectedError == "" {
 				if err != nil {
-					t.Errorf("Expected no error, got: %v", err)
+					t.Errorf("[Provider: ollama, Model: test-model] Expected no error, got: %v", err)
 				}
 			} else {
 				if err == nil {
-					t.Errorf("Expected error containing '%s', got nil", tt.expectedError)
+					t.Errorf("[Provider: ollama, Model: test-model] Expected error containing '%s', got nil", tt.expectedError)
 				} else if !strings.Contains(err.Error(), tt.expectedError) {
-					t.Errorf("Expected error containing '%s', got: %v", tt.expectedError, err)
+					t.Errorf("[Provider: ollama, Model: test-model] Expected error containing '%s', got: %v", tt.expectedError, err)
 				}
 			}
 		})

@@ -11,7 +11,7 @@ import (
 
 const (
 	defaultOllamaEndpoint = "http://localhost:11434"
-	defaultOllamaModel    = "llama3.2"
+	defaultOllamaModel    = "devstral:latest"
 )
 
 // OllamaProvider implements the Provider interface for Ollama
