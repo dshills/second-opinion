@@ -7,9 +7,11 @@ An MCP (Model Context Protocol) server that assists Claude Code in reviewing com
 - **Git Diff Analysis**: Analyze git diff output to understand code changes using LLMs
 - **Code Review**: Review code for quality, security, and best practices with AI assistance
 - **Commit Analysis**: Analyze git commits for quality and adherence to best practices
-- **Uncommitted Work Analysis**: NEW! Analyze all uncommitted changes or just staged changes
+- **Uncommitted Work Analysis**: Analyze all uncommitted changes or just staged changes
 - **Repository Information**: Get information about git repositories
 - **Multiple LLM Support**: Works with OpenAI, Google Gemini, Ollama (local), and Mistral AI
+- **🚀 Smart Optimization**: Dynamic token allocation and task-specific temperature tuning
+- **⚡ Performance Tuning**: Provider-specific optimizations and memory-aware chunking
 - **Security**: Input validation, secure path handling, and API key protection
 - **Memory Safety**: Configurable memory limits and streaming support for large diffs
 
@@ -62,11 +64,11 @@ Create a `.second-opinion.json` file in your home directory:
   },
   "google": {
     "api_key": "your-google-api-key",
-    "model": "gemini-1.5-flash"
+    "model": "gemini-2.0-flash-exp"
   },
   "ollama": {
     "endpoint": "http://localhost:11434",
-    "model": "llama3.2"
+    "model": "devstral:latest"
   },
   "mistral": {
     "api_key": "your-mistral-api-key",
@@ -81,6 +83,12 @@ Create a `.second-opinion.json` file in your home directory:
   }
 }
 ```
+
+**🚀 Smart Optimization Features:**
+- **Dynamic Token Allocation**: Automatically adjusts tokens (4096-32768) based on diff size
+- **Task-Specific Temperature**: Optimizes temperature (0.1-0.3) based on analysis type
+- **Provider Optimization**: Custom parameters for each LLM provider
+- **Memory Management**: Automatic chunking for large diffs and high file counts
 
 ### Environment Variables Configuration
 
@@ -102,10 +110,10 @@ OPENAI_API_KEY=sk-your-openai-api-key
 OPENAI_MODEL=gpt-4o-mini  # or gpt-4o, gpt-4-turbo, gpt-3.5-turbo
 
 GOOGLE_API_KEY=your-google-api-key
-GOOGLE_MODEL=gemini-1.5-flash  # or gemini-1.5-pro, gemini-1.0-pro
+GOOGLE_MODEL=gemini-2.0-flash-exp  # or gemini-1.5-flash, gemini-1.5-pro
 
 OLLAMA_ENDPOINT=http://localhost:11434
-OLLAMA_MODEL=llama3.2  # or codellama, mistral, etc.
+OLLAMA_MODEL=devstral:latest  # or llama3.2, codellama, mistral, etc.
 
 MISTRAL_API_KEY=your-mistral-api-key
 MISTRAL_MODEL=mistral-small-latest  # or mistral-large-latest, codestral-latest
@@ -174,8 +182,8 @@ In Claude Code, you should see "second-opinion" in the MCP servers list. You can
 
 ## Available Tools
 
-### 1. `analyze_git_diff`
-Analyzes git diff output to understand code changes using the configured LLM.
+### 1. `analyze_git_diff` 🚀 **Optimized**
+Analyzes git diff output to understand code changes using the configured LLM with automatic optimization.
 
 **Parameters:**
 - `diff_content` (required): Git diff output to analyze
@@ -183,13 +191,19 @@ Analyzes git diff output to understand code changes using the configured LLM.
 - `provider` (optional): LLM provider to use (overrides default)
 - `model` (optional): Model to use (overrides provider default)
 
+**Smart Optimizations:**
+- **Dynamic Token Allocation**: 4096-32768 tokens based on diff size
+- **Temperature Tuning**: 0.25 optimized for diff analysis
+- **Chunking**: Automatic chunking for large diffs (>10MB or >1000 files)
+- **Provider-Specific**: Custom parameters per LLM provider
+
 **Example in Claude Code:**
 ```
 "Analyze this git diff and tell me what changed: [paste diff here]"
 ```
 
-### 2. `review_code`
-Reviews code for quality, security, and best practices using the configured LLM.
+### 2. `review_code` 🚀 **Optimized**
+Reviews code for quality, security, and best practices using the configured LLM with task-specific optimization.
 
 **Parameters:**
 - `code` (required): Code to review
@@ -198,13 +212,18 @@ Reviews code for quality, security, and best practices using the configured LLM.
 - `provider` (optional): LLM provider to use (overrides default)
 - `model` (optional): Model to use (overrides provider default)
 
+**Smart Optimizations:**
+- **Task-Specific Temperature**: 0.1 for security focus (high precision), 0.2 for general code review
+- **Dynamic Token Allocation**: Scales with code size for comprehensive analysis
+- **Focus-Aware Analysis**: Specialized prompts and parameters per focus area
+
 **Example in Claude Code:**
 ```
 "Review this Python code for security issues: [paste code here]"
 ```
 
-### 3. `analyze_commit`
-Analyzes a git commit for quality and adherence to best practices using the configured LLM.
+### 3. `analyze_commit` 🚀 **Optimized**
+Analyzes a git commit for quality and adherence to best practices using the configured LLM with commit-specific optimization.
 
 **Parameters:**
 - `commit_sha` (optional): Git commit SHA to analyze (default: HEAD)
@@ -212,20 +231,30 @@ Analyzes a git commit for quality and adherence to best practices using the conf
 - `provider` (optional): LLM provider to use (overrides default)
 - `model` (optional): Model to use (overrides provider default)
 
+**Smart Optimizations:**
+- **Commit Analysis Temperature**: 0.2 for consistent, deterministic commit analysis
+- **Memory-Safe Diff Processing**: Handles large commits with automatic truncation
+- **Combined Analysis**: Includes commit message quality, diff analysis, and best practices
+
 **Example in Claude Code:**
 ```
 "Analyze the latest commit in this repository"
 "Analyze commit abc123 and tell me if it follows best practices"
 ```
 
-### 4. `analyze_uncommitted_work` (NEW!)
-Analyzes uncommitted changes in a git repository to help prepare for commits.
+### 4. `analyze_uncommitted_work` 🚀 **Optimized**
+Analyzes uncommitted changes in a git repository to help prepare for commits with intelligent optimization.
 
 **Parameters:**
 - `repo_path` (optional): Path to the git repository (default: current directory)
 - `staged_only` (optional): Analyze only staged changes (default: false, analyzes all uncommitted changes)
 - `provider` (optional): LLM provider to use (overrides default)
 - `model` (optional): Model to use (overrides provider default)
+
+**Smart Optimizations:**
+- **Code Review Temperature**: 0.2 for balanced analysis of uncommitted changes
+- **Large Changeset Handling**: Automatic chunking for extensive modifications
+- **Context-Aware Analysis**: Tailored analysis for staged vs. all uncommitted work
 
 **LLM Analysis Includes:**
 - Summary of all changes (files modified, added, deleted)
@@ -261,6 +290,35 @@ Gets information about a git repository (no LLM analysis).
 - **HTTP Timeouts**: All LLM API calls have 30-second timeouts to prevent hanging
 - **Concurrent Access**: Thread-safe provider management for concurrent requests
 
+## Optimization System 🚀
+
+Second Opinion includes a comprehensive optimization system that automatically tunes performance based on content and context:
+
+### Dynamic Token Allocation
+- **4096 tokens**: Very small diffs (<5KB)
+- **6144 tokens**: Small diffs (5-20KB)  
+- **8192 tokens**: Medium diffs (20-50KB)
+- **12288 tokens**: Large diffs (50-150KB)
+- **16384 tokens**: Very large diffs (150-500KB)
+- **32768 tokens**: Huge diffs (>500KB)
+
+### Task-Specific Temperature Settings
+- **0.1**: Security reviews (maximum precision)
+- **0.2**: Code reviews and commit analysis (mostly deterministic)
+- **0.25**: Diff analysis (slightly flexible)
+- **0.3**: Architecture reviews (allows creativity)
+
+### Provider-Specific Optimizations
+- **OpenAI**: Full token allocation with top_p=0.9
+- **Google**: Capped at 8192 tokens with focused sampling (top_k=20, top_p=0.8)
+- **Mistral**: Conservative allocation with top_p=0.8
+- **Ollama**: Local model optimization with repeat_penalty=1.05
+
+### Memory Management
+- **Automatic Chunking**: Large diffs (>10MB or >1000 files) are intelligently split
+- **Smart Chunk Sizing**: Adapts chunk size based on file count
+- **Memory-Aware Streaming**: Enables streaming for large operations
+
 ## Development
 
 ### Project Structure
@@ -269,13 +327,15 @@ second-opinion/
 ├── main.go              # MCP server setup and tool registration
 ├── handlers.go          # Tool handler implementations
 ├── validation.go        # Input validation functions
-├── config/              # Configuration loading
+├── config/              # Configuration loading and optimization
+│   ├── config.go        # Main configuration with optimization methods
+│   └── optimization_test.go # Comprehensive optimization tests
 ├── llm/                 # LLM provider implementations
-│   ├── provider.go      # Provider interface and prompts
+│   ├── provider.go      # Provider interface, prompts, and optimization wrapper
 │   ├── openai.go        # OpenAI implementation
 │   ├── google.go        # Google Gemini implementation
-│   ├── ollama.go        # Ollama implementation
-│   └── mistral.go       # Mistral implementation
+│   ├── ollama.go        # Ollama implementation with advanced options
+│   └── mistral.go       # Mistral implementation with additional parameters
 ├── CLAUDE.md           # Claude Code specific instructions
 └── TODO.md             # Development roadmap
 ```
@@ -284,6 +344,9 @@ second-opinion/
 ```bash
 # Run all tests
 go test ./... -v
+
+# Run optimization tests specifically
+go test ./config -v
 
 # Run specific test suites
 go test ./llm -v -run TestProviderConnections
