@@ -1,16 +1,25 @@
 # Second Opinion 🔍
 
-An MCP (Model Context Protocol) server that assists Claude Code in reviewing commits and code bases. This tool leverages external LLMs (OpenAI, Google Gemini, Ollama, Mistral) to provide intelligent code review capabilities, git diff analysis, and commit quality assessment.
+An MCP (Model Context Protocol) server that assists Claude Code in reviewing commits and code bases. This tool leverages external LLMs (OpenAI, Google Gemini, Ollama, Mistral) to provide intelligent code review capabilities, git diff analysis, commit quality assessment, and uncommitted work analysis.
 
 ## Features
 
 - **Git Diff Analysis**: Analyze git diff output to understand code changes using LLMs
 - **Code Review**: Review code for quality, security, and best practices with AI assistance
 - **Commit Analysis**: Analyze git commits for quality and adherence to best practices
+- **Uncommitted Work Analysis**: NEW! Analyze all uncommitted changes or just staged changes
 - **Repository Information**: Get information about git repositories
 - **Multiple LLM Support**: Works with OpenAI, Google Gemini, Ollama (local), and Mistral AI
+- **Security**: Input validation, secure path handling, and API key protection
 
 ## Installation
+
+### Prerequisites
+- Go 1.20 or higher
+- Git
+- Claude Code Desktop app
+
+### Build from Source
 
 1. Clone the repository:
 ```bash
@@ -76,10 +85,6 @@ cp .env.example .env
 
 2. Edit `.env` and configure your LLM providers:
 
-### Multi-Provider Configuration
-
-The server now supports configuring multiple LLM providers simultaneously. You can set a default provider and switch between providers at runtime.
-
 ```env
 # Set your default provider
 DEFAULT_PROVIDER=openai  # or google, ollama, mistral
@@ -98,38 +103,23 @@ MISTRAL_API_KEY=your-mistral-api-key
 MISTRAL_MODEL=mistral-small-latest  # or mistral-large-latest, codestral-latest
 
 # Global settings apply to all providers
-LLM_TEMPERATURE=0.3  # Controls randomness (0.0-2.0)
-LLM_MAX_TOKENS=4096  # Maximum response length
+LLM_TEMPERATURE=0.3  # Controls randomness (0.0-2.0, default: 0.3)
+LLM_MAX_TOKENS=4096  # Maximum response length (default: 4096)
 ```
 
-### Runtime Provider Selection
+## Setting up with Claude Code
 
-Each tool supports optional `provider` and `model` parameters to override the defaults:
+### 1. Locate Claude Code Configuration
 
-```
-# Use default provider
-"analyze_git_diff": {"diff_content": "..."}
+The configuration file location depends on your operating system:
 
-# Use specific provider
-"analyze_git_diff": {"diff_content": "...", "provider": "google"}
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
-# Use specific provider and model
-"analyze_git_diff": {"diff_content": "...", "provider": "openai", "model": "gpt-4o"}
-```
+### 2. Edit Configuration
 
-## Usage
-
-### Running the Server
-
-The server runs over stdio, making it compatible with MCP clients:
-
-```bash
-./bin/second-opinion
-```
-
-### Configuring with Claude Desktop
-
-Add the following to your Claude Desktop configuration:
+Open the configuration file and add the Second Opinion server:
 
 **Option 1: Using JSON Configuration (Recommended)**
 ```json
@@ -141,7 +131,8 @@ Add the following to your Claude Desktop configuration:
   }
 }
 ```
-This will use the configuration from `~/.second-opinion.json` in your home directory.
+
+Replace `/path/to/second-opinion` with the actual path where you cloned the repository.
 
 **Option 2: Using Environment Variables**
 ```json
@@ -152,15 +143,26 @@ This will use the configuration from `~/.second-opinion.json` in your home direc
       "env": {
         "DEFAULT_PROVIDER": "openai",
         "OPENAI_API_KEY": "your-openai-api-key",
-        "GOOGLE_API_KEY": "your-google-api-key"
+        "OPENAI_MODEL": "gpt-4o-mini",
+        "LLM_TEMPERATURE": "0.3",
+        "LLM_MAX_TOKENS": "4096"
       }
     }
   }
 }
 ```
 
-**Option 3: Using .env File**
-Place a `.env` file in the second-opinion project directory with all provider configurations, then use the simple configuration in Claude Desktop.
+### 3. Restart Claude Code
+
+After saving the configuration, restart Claude Code for the changes to take effect.
+
+### 4. Verify Installation
+
+In Claude Code, you should see "second-opinion" in the MCP servers list. You can test it by asking:
+
+```
+"What git repository information can you get from the current directory?"
+```
 
 ## Available Tools
 
@@ -173,11 +175,10 @@ Analyzes git diff output to understand code changes using the configured LLM.
 - `provider` (optional): LLM provider to use (overrides default)
 - `model` (optional): Model to use (overrides provider default)
 
-**LLM Analysis Includes:**
-- Summary of changes (files changed, lines added/removed)
-- Type of change (feature, bugfix, refactor, etc.)
-- Potential issues or concerns
-- Brief summary (if requested)
+**Example in Claude Code:**
+```
+"Analyze this git diff and tell me what changed: [paste diff here]"
+```
 
 ### 2. `review_code`
 Reviews code for quality, security, and best practices using the configured LLM.
@@ -189,12 +190,10 @@ Reviews code for quality, security, and best practices using the configured LLM.
 - `provider` (optional): LLM provider to use (overrides default)
 - `model` (optional): Model to use (overrides provider default)
 
-**LLM Review Includes:**
-- Security vulnerabilities
-- Performance concerns
-- Code quality and style issues
-- Best practice violations
-- Suggestions for improvement
+**Example in Claude Code:**
+```
+"Review this Python code for security issues: [paste code here]"
+```
 
 ### 3. `analyze_commit`
 Analyzes a git commit for quality and adherence to best practices using the configured LLM.
@@ -205,107 +204,152 @@ Analyzes a git commit for quality and adherence to best practices using the conf
 - `provider` (optional): LLM provider to use (overrides default)
 - `model` (optional): Model to use (overrides provider default)
 
-**LLM Analysis Includes:**
-- Summary of commit changes
-- Commit message quality assessment
-- Best practices adherence
-- Improvement suggestions
+**Example in Claude Code:**
+```
+"Analyze the latest commit in this repository"
+"Analyze commit abc123 and tell me if it follows best practices"
+```
 
-### 4. `get_repo_info`
+### 4. `analyze_uncommitted_work` (NEW!)
+Analyzes uncommitted changes in a git repository to help prepare for commits.
+
+**Parameters:**
+- `repo_path` (optional): Path to the git repository (default: current directory)
+- `staged_only` (optional): Analyze only staged changes (default: false, analyzes all uncommitted changes)
+- `provider` (optional): LLM provider to use (overrides default)
+- `model` (optional): Model to use (overrides provider default)
+
+**LLM Analysis Includes:**
+- Summary of all changes (files modified, added, deleted)
+- Type and nature of changes (feature, bugfix, refactor, etc.)
+- Completeness and readiness for commit
+- Potential issues or concerns
+- Suggested commit message(s) if changes are ready
+- Recommendations for organizing commits if changes should be split
+
+**Example in Claude Code:**
+```
+"Analyze my uncommitted changes and suggest a commit message"
+"Review only my staged changes before I commit"
+"Should I split my current changes into multiple commits?"
+```
+
+### 5. `get_repo_info`
 Gets information about a git repository (no LLM analysis).
 
 **Parameters:**
 - `repo_path` (optional): Path to the git repository (default: current directory)
 
-## Example Usage in Claude
-
-Once configured, you can use these tools in Claude:
-
-### Basic Usage (uses default provider)
+**Example in Claude Code:**
 ```
-"Can you analyze the latest commit in my repository?"
-"Review this code for security issues: [paste code]"
-"What changes are in this diff: [paste git diff]"
+"Show me information about this git repository"
 ```
 
-### Using Specific Providers
-```
-"Analyze this commit using Google Gemini"
-"Review this code with Ollama's codellama model"
-"Use GPT-4o to analyze this diff"
-```
+## Security Features
 
-The tools will automatically use the provider and model specified in the request, or fall back to your configured defaults.
+- **Input Validation**: All repository paths and commit SHAs are validated to prevent command injection
+- **Path Restrictions**: Repository paths must be within the current working directory
+- **API Key Protection**: API keys are never exposed in error messages or logs
+- **HTTP Timeouts**: All LLM API calls have 30-second timeouts to prevent hanging
+- **Concurrent Access**: Thread-safe provider management for concurrent requests
 
 ## Development
 
+### Project Structure
+```
+second-opinion/
+├── main.go              # MCP server setup and tool registration
+├── handlers.go          # Tool handler implementations
+├── validation.go        # Input validation functions
+├── config/              # Configuration loading
+├── llm/                 # LLM provider implementations
+│   ├── provider.go      # Provider interface and prompts
+│   ├── openai.go        # OpenAI implementation
+│   ├── google.go        # Google Gemini implementation
+│   ├── ollama.go        # Ollama implementation
+│   └── mistral.go       # Mistral implementation
+├── CLAUDE.md           # Claude Code specific instructions
+└── TODO.md             # Development roadmap
+```
+
 ### Running Tests
-
-The project includes comprehensive tests for LLM provider connections and tool functionality.
-
-#### Prerequisites
-1. Create a `.env` file with your API keys:
-```bash
-cp .env.example .env
-# Edit .env with your actual API keys
-```
-
-2. For Ollama tests, ensure Ollama is running locally:
-```bash
-ollama serve
-```
-
-#### Test Commands
-
-Using the test script:
-```bash
-# Run all tests
-./test.sh
-
-# Test provider connections only
-./test.sh providers
-
-# Test different models
-./test.sh models
-
-# Run integration tests
-./test.sh integration
-
-# Run quick tests (no API calls)
-./test.sh quick
-```
-
-Using Go directly:
 ```bash
 # Run all tests
 go test ./... -v
 
 # Run specific test suites
 go test ./llm -v -run TestProviderConnections
-go test ./llm -v -run TestProviderModels
-go test . -v -run TestHandleGitDiff
 
-# Run with timeout
-go test ./... -v -timeout 5m
+# Run with race detection
+go test -race ./...
+
+# Run with coverage
+go test -cover ./...
 ```
-
-#### Test Structure
-
-- **Provider Connection Tests** (`llm/provider_test.go`): Tests connections to each configured LLM provider
-- **Model Tests**: Tests different models for providers that support multiple models
-- **Integration Tests** (`main_test.go`): Tests the MCP tool handlers with real LLM calls
-- **Unit Tests**: Tests individual components without external dependencies
-
-The tests will automatically skip providers that aren't configured in your `.env` file.
 
 ### Linting
 ```bash
+# Install golangci-lint if not already installed
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+# Run linter
 golangci-lint run
+
+# Auto-fix issues where possible
+golangci-lint run --fix
+```
+
+### Building
+```bash
+# Build for current platform
+go build -o bin/second-opinion
+
+# Build with race detector (for development)
+go build -race -o bin/second-opinion
+
+# Build for different platforms
+GOOS=darwin GOARCH=amd64 go build -o bin/second-opinion-darwin-amd64
+GOOS=linux GOARCH=amd64 go build -o bin/second-opinion-linux-amd64
+GOOS=windows GOARCH=amd64 go build -o bin/second-opinion-windows-amd64.exe
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"Provider not configured" error**
+   - Ensure you have set up either `~/.second-opinion.json` or environment variables
+   - Check that API keys are valid and have appropriate permissions
+
+2. **"Not a git repository" error**
+   - Ensure you're running the tool in a directory with a `.git` folder
+   - The tool validates that paths are git repositories for security
+
+3. **Timeout errors**
+   - Check your internet connection
+   - For Ollama, ensure the local server is running: `ollama serve`
+   - Consider using a faster model if timeouts persist
+
+4. **Permission denied errors**
+   - The tool only allows access to the current working directory and subdirectories
+   - Ensure the binary has execute permissions: `chmod +x bin/second-opinion`
+
+### Debug Mode
+
+To see detailed logs, you can run the server directly:
+```bash
+./bin/second-opinion 2>debug.log
 ```
 
 ## Contributing
 
-Contributions are welcome! Please ensure all tests pass and the linter is happy before submitting a PR.
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Ensure all tests pass and linting is clean
+4. Submit a pull request
+
+See [TODO.md](TODO.md) for planned features and known issues.
 
 ## License
 
