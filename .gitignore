@@ -30,18 +30,17 @@ __debug_bin*
 go.work
 go.work.sum
 
-# Test Reports
+# Test Reports and Coverage
 c.out
+*.out
+coverage*.out
+coverage*.html
 unit-tests.xml
-coverage.html
 godog.json
+test_failure_*.log
 
 # Test Output
 test/testdata/*/output
-
-# Profiling
-*.out
-/test/integration/local_integration_test.go
 
 # locally built binaries
 bin/
