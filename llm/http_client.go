@@ -19,7 +19,7 @@ type HTTPClientConfig struct {
 // DefaultHTTPClientConfig returns optimized defaults for LLM API calls
 func DefaultHTTPClientConfig() HTTPClientConfig {
 	return HTTPClientConfig{
-		Timeout:               30 * time.Second,
+		Timeout:               5 * time.Minute, // Increased from 30s to 5 minutes for large reviews
 		MaxIdleConns:          100,
 		MaxConnsPerHost:       10,
 		MaxIdleConnsPerHost:   10,

@@ -10,7 +10,7 @@ func TestDefaultHTTPClientConfig(t *testing.T) {
 	config := DefaultHTTPClientConfig()
 
 	expected := HTTPClientConfig{
-		Timeout:               30 * time.Second,
+		Timeout:               5 * time.Minute,
 		MaxIdleConns:          100,
 		MaxConnsPerHost:       10,
 		MaxIdleConnsPerHost:   10,
@@ -93,7 +93,7 @@ func TestSharedHTTPClient(t *testing.T) {
 	}
 
 	// Verify it has the expected timeout
-	expectedTimeout := 30 * time.Second
+	expectedTimeout := 5 * time.Minute
 	if client1.Timeout != expectedTimeout {
 		t.Errorf("SharedHTTPClient timeout = %v, expected %v", client1.Timeout, expectedTimeout)
 	}
@@ -142,7 +142,7 @@ func TestHTTPClientOptimizations(t *testing.T) {
 		value    time.Duration
 		expected time.Duration
 	}{
-		{"Client Timeout", client.Timeout, 30 * time.Second},
+		{"Client Timeout", client.Timeout, 5 * time.Minute},
 		{"IdleConnTimeout", transport.IdleConnTimeout, 90 * time.Second},
 		{"TLSHandshakeTimeout", transport.TLSHandshakeTimeout, 10 * time.Second},
 		{"ExpectContinueTimeout", transport.ExpectContinueTimeout, 1 * time.Second},

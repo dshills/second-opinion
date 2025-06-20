@@ -29,6 +29,16 @@ func DefaultRetryConfig() RetryConfig {
 	}
 }
 
+// ExtendedRetryConfig provides retry config for large requests
+func ExtendedRetryConfig() RetryConfig {
+	return RetryConfig{
+		MaxRetries:      5, // More retries for large requests
+		BaseDelay:       2 * time.Second,
+		MaxDelay:        60 * time.Second,
+		BackoffMultiple: 1.5, // Less aggressive backoff
+	}
+}
+
 // IsRetryableError determines if an error should trigger a retry
 func IsRetryableError(err error) bool {
 	if err == nil {
