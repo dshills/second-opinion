@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	cfg             *config.Config
-	llmProviders    = make(map[string]llm.Provider)
-	llmProvidersMux sync.RWMutex
+	cfg                   *config.Config
+	llmProviders          = make(map[string]llm.Provider)
+	optimizedLLMProviders = make(map[string]llm.OptimizedProvider)
+	llmProvidersMux       sync.RWMutex
 )
 
 func main() {
@@ -59,6 +60,7 @@ func main() {
 
 	llmProvidersMux.Lock()
 	llmProviders[cfg.DefaultProvider] = defaultProvider
+	optimizedLLMProviders[cfg.DefaultProvider] = llm.NewOptimizedProvider(defaultProvider, cfg)
 	llmProvidersMux.Unlock()
 
 	s := server.NewMCPServer(
@@ -209,6 +211,50 @@ func getOrCreateProvider(providerName, modelOverride string) (llm.Provider, erro
 	// Cache the provider with write lock
 	llmProvidersMux.Lock()
 	llmProviders[cacheKey] = provider
+	optimizedLLMProviders[cacheKey] = llm.NewOptimizedProvider(provider, cfg)
 	llmProvidersMux.Unlock()
 	return provider, nil
+}
+
+// getOrCreateOptimizedProvider gets or creates an optimized LLM provider
+func getOrCreateOptimizedProvider(providerName, modelOverride string) (llm.OptimizedProvider, error) {
+	// Use default provider if not specified
+	if providerName == "" {
+		providerName = cfg.DefaultProvider
+	}
+
+	// Create a cache key that includes both provider and model
+	cacheKey := providerName
+	if modelOverride != "" {
+		cacheKey = fmt.Sprintf("%s:%s", providerName, modelOverride)
+	}
+
+	// Check if we already have this optimized provider configured
+	llmProvidersMux.RLock()
+	if optimizedProvider, exists := optimizedLLMProviders[cacheKey]; exists {
+		llmProvidersMux.RUnlock()
+		return optimizedProvider, nil
+	}
+	llmProvidersMux.RUnlock()
+
+	// Get or create the base provider first
+	baseProvider, err := getOrCreateProvider(providerName, modelOverride)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create optimized wrapper if not already cached
+	llmProvidersMux.Lock()
+	defer llmProvidersMux.Unlock()
+
+	// Double-check after acquiring write lock
+	if optimizedProvider, exists := optimizedLLMProviders[cacheKey]; exists {
+		return optimizedProvider, nil
+	}
+
+	// Create new optimized provider
+	optimizedProvider := llm.NewOptimizedProvider(baseProvider, cfg)
+	optimizedLLMProviders[cacheKey] = optimizedProvider
+
+	return optimizedProvider, nil
 }

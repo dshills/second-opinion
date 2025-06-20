@@ -54,7 +54,7 @@ func NewMistralProvider(config Config) (*MistralProvider, error) {
 func (p *MistralProvider) Analyze(ctx context.Context, prompt string) (string, error) {
 	requestBody := map[string]any{
 		"model": p.model,
-		"messages": []map[string]string{
+		"messages": []map[string]any{
 			{
 				"role":    "system",
 				"content": "You are an expert code reviewer and git analysis assistant. Provide clear, actionable feedback.",
@@ -66,6 +66,10 @@ func (p *MistralProvider) Analyze(ctx context.Context, prompt string) (string, e
 		},
 		"temperature": p.temperature,
 		"max_tokens":  p.maxTokens,
+		"top_p":       0.95,
+		"random_seed": nil,
+		"safe_prompt": false,
+		"tool_choice": "auto",
 	}
 
 	jsonBody, err := json.Marshal(requestBody)

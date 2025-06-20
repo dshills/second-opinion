@@ -199,6 +199,179 @@ func (c *Config) GetProviderConfig(provider string) (apiKey, model, endpoint str
 	}
 }
 
+// AnalysisTask defines the type of analysis being performed
+type AnalysisTask string
+
+const (
+	TaskCodeReview         AnalysisTask = "code_review"
+	TaskSecurityReview     AnalysisTask = "security_review"
+	TaskCommitAnalysis     AnalysisTask = "commit_analysis"
+	TaskArchitectureReview AnalysisTask = "architecture_review"
+	TaskDiffAnalysis       AnalysisTask = "diff_analysis"
+	TaskGeneral            AnalysisTask = "general"
+)
+
+// GetOptimalTokensForDiff returns optimal token count based on diff size
+func (c *Config) GetOptimalTokensForDiff(diffSizeBytes int) int {
+	// Convert bytes to KB for easier thresholds
+	diffSizeKB := diffSizeBytes / 1024
+
+	switch {
+	case diffSizeKB < 5: // Very small diffs (< 5KB)
+		return 4096
+	case diffSizeKB < 20: // Small diffs (5-20KB)
+		return 6144
+	case diffSizeKB < 50: // Medium diffs (20-50KB)
+		return 8192
+	case diffSizeKB < 150: // Large diffs (50-150KB)
+		return 12288
+	case diffSizeKB < 500: // Very large diffs (150-500KB)
+		return 16384
+	default: // Huge diffs (> 500KB)
+		return 32768
+	}
+}
+
+// GetOptimalTemperatureForTask returns optimal temperature based on analysis task
+func (c *Config) GetOptimalTemperatureForTask(task AnalysisTask) float64 {
+	switch task {
+	case TaskSecurityReview:
+		return 0.1 // Very deterministic for security issues
+	case TaskCodeReview, TaskCommitAnalysis:
+		return 0.2 // Mostly deterministic for code analysis
+	case TaskDiffAnalysis:
+		return 0.25 // Slightly more flexible for diff interpretation
+	case TaskArchitectureReview:
+		return 0.3 // Allow creativity for architectural suggestions
+	case TaskGeneral:
+		return 0.3 // Balanced for general queries
+	default:
+		return 0.2 // Safe default
+	}
+}
+
+// GetProviderOptimizedConfig returns provider-specific optimized configuration
+func (c *Config) GetProviderOptimizedConfig(provider string, diffSize int, task AnalysisTask) (maxTokens int, temperature float64, providerConfig map[string]any) {
+	baseTokens := c.GetOptimalTokensForDiff(diffSize)
+	baseTemp := c.GetOptimalTemperatureForTask(task)
+
+	// Provider-specific adjustments
+	switch provider {
+	case "openai":
+		// OpenAI has excellent context handling, can use full allocation
+		maxTokens = baseTokens
+		temperature = baseTemp
+		providerConfig = map[string]any{
+			"top_p": 0.9,
+		}
+
+	case "google":
+		// Gemini has massive context window, optimize for quality
+		maxTokens = min(baseTokens, 8192) // Gemini works well with moderate token counts
+		temperature = baseTemp
+		providerConfig = map[string]any{
+			"top_k":           20,  // More focused sampling for code
+			"top_p":           0.8, // Conservative nucleus sampling
+			"candidate_count": 1,
+		}
+
+	case "mistral":
+		// Mistral is efficient, use moderate allocation
+		maxTokens = min(baseTokens, 8192)
+		temperature = baseTemp
+		providerConfig = map[string]any{
+			"top_p":      0.8, // More conservative
+			"max_tokens": maxTokens,
+		}
+
+	case "ollama":
+		// Ollama depends on local model, be more conservative
+		maxTokens = min(baseTokens, 8192)
+		temperature = baseTemp
+		providerConfig = map[string]any{
+			"top_k":          20,   // More focused
+			"top_p":          0.8,  // Conservative
+			"repeat_penalty": 1.05, // Reduce repetition
+			"num_predict":    maxTokens,
+		}
+
+	default:
+		maxTokens = baseTokens
+		temperature = baseTemp
+		providerConfig = map[string]any{}
+	}
+
+	return maxTokens, temperature, providerConfig
+}
+
+// ShouldChunkDiff determines if a diff should be chunked based on size and complexity
+func (c *Config) ShouldChunkDiff(diffSizeBytes int, fileCount int) (shouldChunk bool, chunkSizeBytes int) {
+	maxSizeBytes := c.Memory.MaxDiffSizeMB * 1024 * 1024
+
+	// Check size threshold
+	if diffSizeBytes > maxSizeBytes {
+		shouldChunk = true
+	}
+
+	// Check file count threshold
+	if fileCount > c.Memory.MaxFileCount {
+		shouldChunk = true
+	}
+
+	// Calculate optimal chunk size
+	chunkSizeBytes = c.Memory.ChunkSizeMB * 1024 * 1024
+
+	// Adjust chunk size based on file count
+	if fileCount > 100 {
+		// Smaller chunks for repos with many files
+		chunkSizeBytes = chunkSizeBytes / 2
+	}
+
+	return shouldChunk, chunkSizeBytes
+}
+
+// EstimateTokensForText estimates token count for text (rough approximation)
+func (c *Config) EstimateTokensForText(text string) int {
+	// Rough estimation: ~4 characters per token for code
+	return len(text) / 4
+}
+
+// GetMemoryOptimizedConfig returns memory-aware configuration for large operations
+func (c *Config) GetMemoryOptimizedConfig(estimatedInputTokens int) (streaming bool, batchSize int) {
+	streaming = c.Memory.EnableStreaming
+
+	// Force streaming for large inputs
+	if estimatedInputTokens > 8192 {
+		streaming = true
+	}
+
+	// Calculate batch size based on available "memory budget"
+	maxBudget := 16384 // Conservative token budget per request
+	if estimatedInputTokens < maxBudget/2 {
+		batchSize = 1 // Process all at once
+	} else {
+		batchSize = max(1, maxBudget/estimatedInputTokens)
+	}
+
+	return streaming, batchSize
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// max returns the maximum of two integers
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 // getEnv gets an environment variable with a default value.
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {

@@ -19,6 +19,7 @@ type OllamaProvider struct {
 	endpoint    string
 	model       string
 	temperature float64
+	maxTokens   int
 	retryConfig RetryConfig
 	httpClient  *http.Client
 }
@@ -40,10 +41,16 @@ func NewOllamaProvider(config Config) (*OllamaProvider, error) {
 		temperature = 0.3
 	}
 
+	maxTokens := config.MaxTokens
+	if maxTokens == 0 {
+		maxTokens = 4096
+	}
+
 	return &OllamaProvider{
 		endpoint:    endpoint,
 		model:       model,
 		temperature: temperature,
+		maxTokens:   maxTokens,
 		retryConfig: DefaultRetryConfig(),
 		httpClient:  SharedHTTPClient,
 	}, nil
@@ -57,7 +64,12 @@ func (p *OllamaProvider) Analyze(ctx context.Context, prompt string) (string, er
 		"system": "You are an expert code reviewer and git analysis assistant. Provide clear, actionable feedback.",
 		"stream": false,
 		"options": map[string]any{
-			"temperature": p.temperature,
+			"temperature":    p.temperature,
+			"num_predict":    p.maxTokens,
+			"top_k":          40,
+			"top_p":          0.9,
+			"repeat_last_n":  64,
+			"repeat_penalty": 1.1,
 		},
 	}
 

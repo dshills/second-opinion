@@ -113,3 +113,9 @@ The project supports multiple environments through .env files:
 - `.env` - Default environment variables
 - `.env.local`, `.env.*.local` - Local overrides (git-ignored)
 - `.env.development`, `.env.test`, `.env.production` - Environment-specific configs
+
+## Development Tips and Tricks
+
+- **Search Tools**:
+  - Use ripgrep (rg) instead of grep if available. Run rg -help to understand usage
+  - Use Fuzzy Find (fzf) instead of find if available. Run fzf -h to understand usage

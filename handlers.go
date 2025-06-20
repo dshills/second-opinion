@@ -32,8 +32,8 @@ func handleGitDiff(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 		modelOverride = m
 	}
 
-	// Get or create the appropriate provider
-	provider, err := getOrCreateProvider(providerName, modelOverride)
+	// Get or create the appropriate optimized provider
+	optimizedProvider, err := getOrCreateOptimizedProvider(providerName, modelOverride)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -43,8 +43,10 @@ func handleGitDiff(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 		"summarize": summarize,
 	})
 
-	// Get analysis from LLM
-	analysis, err := provider.Analyze(ctx, prompt)
+	// Get analysis from LLM using optimization
+	contentSize := len(diffContent)
+	task := llm.GetTaskFromAnalysisType("diff")
+	analysis, err := optimizedProvider.AnalyzeOptimized(ctx, prompt, contentSize, task)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("LLM analysis failed: %v", err)), nil
 	}
@@ -79,8 +81,8 @@ func handleCodeReview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 		modelOverride = m
 	}
 
-	// Get or create the appropriate provider
-	provider, err := getOrCreateProvider(providerName, modelOverride)
+	// Get or create the appropriate optimized provider
+	optimizedProvider, err := getOrCreateOptimizedProvider(providerName, modelOverride)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -91,8 +93,14 @@ func handleCodeReview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 		"focus":    focus,
 	})
 
-	// Get review from LLM
-	review, err := provider.Analyze(ctx, prompt)
+	// Get review from LLM using optimization
+	contentSize := len(code)
+	task := llm.GetTaskFromAnalysisType("code_review")
+	// If focus is security, use security-specific task
+	if focus == "security" {
+		task = llm.GetTaskFromAnalysisType("security")
+	}
+	review, err := optimizedProvider.AnalyzeOptimized(ctx, prompt, contentSize, task)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("LLM review failed: %v", err)), nil
 	}
@@ -150,8 +158,8 @@ func handleCommitAnalysis(ctx context.Context, request mcp.CallToolRequest) (*mc
 		modelOverride = m
 	}
 
-	// Get or create the appropriate provider
-	provider, err := getOrCreateProvider(providerName, modelOverride)
+	// Get or create the appropriate optimized provider
+	optimizedProvider, err := getOrCreateOptimizedProvider(providerName, modelOverride)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -165,8 +173,10 @@ func handleCommitAnalysis(ctx context.Context, request mcp.CallToolRequest) (*mc
 	// Create prompt for LLM analysis
 	prompt := llm.AnalysisPrompt("commit", commitInfo, nil)
 
-	// Get analysis from LLM
-	analysis, err := provider.Analyze(ctx, prompt)
+	// Get analysis from LLM using optimization
+	contentSize := len(commitInfo)
+	task := llm.GetTaskFromAnalysisType("commit")
+	analysis, err := optimizedProvider.AnalyzeOptimized(ctx, prompt, contentSize, task)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("LLM analysis failed: %v", err)), nil
 	}
@@ -299,8 +309,8 @@ func handleAnalyzeUncommittedWork(ctx context.Context, request mcp.CallToolReque
 		modelOverride = m
 	}
 
-	// Get or create the appropriate provider
-	provider, err := getOrCreateProvider(providerName, modelOverride)
+	// Get or create the appropriate optimized provider
+	optimizedProvider, err := getOrCreateOptimizedProvider(providerName, modelOverride)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -320,8 +330,10 @@ func handleAnalyzeUncommittedWork(ctx context.Context, request mcp.CallToolReque
 		"staged_only": stagedOnly,
 	})
 
-	// Get analysis from LLM
-	analysis, err := provider.Analyze(ctx, prompt)
+	// Get analysis from LLM using optimization
+	contentSize := len(diffContent)
+	task := llm.GetTaskFromAnalysisType("uncommitted_work")
+	analysis, err := optimizedProvider.AnalyzeOptimized(ctx, prompt, contentSize, task)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("LLM analysis failed: %v", err)), nil
 	}
