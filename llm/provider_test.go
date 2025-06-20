@@ -3,7 +3,6 @@ package llm_test
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -268,10 +267,3 @@ func TestEnvironmentVariables(t *testing.T) {
 	})
 }
 */
-
-// Helper function to check if Ollama is running
-func isOllamaRunning(endpoint string) bool {
-	// For now, just check if the endpoint is localhost
-	// In a real implementation, you might want to ping the endpoint
-	return strings.Contains(endpoint, "localhost") || strings.Contains(endpoint, "127.0.0.1")
-}

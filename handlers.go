@@ -215,3 +215,123 @@ func getRepoInfo(repoPath string) string {
 
 	return info.String()
 }
+
+func handleAnalyzeUncommittedWork(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	repoPath := "."
+	if path, ok := request.GetArguments()["repo_path"].(string); ok && path != "" {
+		repoPath = path
+	}
+
+	stagedOnly := false
+	if staged, ok := request.GetArguments()["staged_only"].(bool); ok {
+		stagedOnly = staged
+	}
+
+	// Get provider and model from request
+	providerName := ""
+	if p, ok := request.GetArguments()["provider"].(string); ok {
+		providerName = p
+	}
+
+	modelOverride := ""
+	if m, ok := request.GetArguments()["model"].(string); ok {
+		modelOverride = m
+	}
+
+	// Get or create the appropriate provider
+	provider, err := getOrCreateProvider(providerName, modelOverride)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	// Get uncommitted changes
+	diffContent, err := getUncommittedChanges(repoPath, stagedOnly)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	if diffContent == "" {
+		return mcp.NewToolResultText("No uncommitted changes found."), nil
+	}
+
+	// Create prompt for LLM analysis
+	prompt := llm.AnalysisPrompt("uncommitted_work", diffContent, map[string]any{
+		"staged_only": stagedOnly,
+	})
+
+	// Get analysis from LLM
+	analysis, err := provider.Analyze(ctx, prompt)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("LLM analysis failed: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(analysis), nil
+}
+
+func getUncommittedChanges(repoPath string, stagedOnly bool) (string, error) {
+	var info strings.Builder
+
+	// Add header
+	if stagedOnly {
+		info.WriteString("📋 Staged Changes Analysis\n\n")
+	} else {
+		info.WriteString("📝 Uncommitted Work Analysis\n\n")
+	}
+
+	// Get status summary
+	statusCmd := exec.Command("git", "-C", repoPath, "status", "--short")
+	statusOutput, err := statusCmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get git status: %v", err)
+	}
+
+	if len(statusOutput) == 0 {
+		return "", nil
+	}
+
+	info.WriteString("Files changed:\n")
+	info.WriteString(string(statusOutput))
+	info.WriteString("\n")
+
+	// Get diff
+	var diffCmd *exec.Cmd
+	if stagedOnly {
+		// Get only staged changes
+		diffCmd = exec.Command("git", "-C", repoPath, "diff", "--cached")
+	} else {
+		// Get all changes (staged and unstaged)
+		diffCmd = exec.Command("git", "-C", repoPath, "diff", "HEAD")
+	}
+
+	diffOutput, err := diffCmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get diff: %v", err)
+	}
+
+	// If no diff from HEAD, try to get staged changes
+	if len(diffOutput) == 0 && !stagedOnly {
+		diffCmd = exec.Command("git", "-C", repoPath, "diff", "--cached")
+		diffOutput, _ = diffCmd.Output()
+	}
+
+	if len(diffOutput) > 0 {
+		info.WriteString("Diff:\n")
+		info.WriteString(string(diffOutput))
+	}
+
+	// Get statistics
+	var statCmd *exec.Cmd
+	if stagedOnly {
+		statCmd = exec.Command("git", "-C", repoPath, "diff", "--cached", "--stat")
+	} else {
+		statCmd = exec.Command("git", "-C", repoPath, "diff", "HEAD", "--stat")
+	}
+
+	statOutput, _ := statCmd.Output()
+	if len(statOutput) > 0 {
+		info.WriteString("\n\nStatistics:\n")
+		info.WriteString(string(statOutput))
+	}
+
+	return info.String(), nil
+}

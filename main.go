@@ -132,6 +132,24 @@ func main() {
 	)
 	s.AddTool(repoInfoTool, handleRepoInfo)
 
+	// Analyze uncommitted work tool
+	uncommittedWorkTool := mcp.NewTool("analyze_uncommitted_work",
+		mcp.WithDescription("Analyze uncommitted changes in a git repository using LLM"),
+		mcp.WithString("repo_path",
+			mcp.Description("Path to the git repository (default: current directory)"),
+		),
+		mcp.WithBoolean("staged_only",
+			mcp.Description("Analyze only staged changes (default: false, analyzes all uncommitted changes)"),
+		),
+		mcp.WithString("provider",
+			mcp.Description("LLM provider to use (openai, google, ollama, mistral)"),
+		),
+		mcp.WithString("model",
+			mcp.Description("Model to use (overrides default for provider)"),
+		),
+	)
+	s.AddTool(uncommittedWorkTool, handleAnalyzeUncommittedWork)
+
 	// Start the stdio server
 	log.Printf("Starting %s with default provider: %s", cfg.ServerName, cfg.DefaultProvider)
 	if err := server.ServeStdio(s); err != nil {

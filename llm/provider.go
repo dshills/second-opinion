@@ -92,6 +92,30 @@ Provide:
 4. Suggestions for improvement`, content)
 		return prompt
 
+	case "uncommitted_work":
+		stagedOnly := false
+		if s, ok := options["staged_only"].(bool); ok {
+			stagedOnly = s
+		}
+
+		changeType := "uncommitted changes"
+		if stagedOnly {
+			changeType = "staged changes"
+		}
+
+		prompt := fmt.Sprintf(`Analyze these %s in the repository:
+
+%s
+
+Provide:
+1. Summary of all changes (files modified, added, deleted)
+2. Type and nature of changes (feature, bugfix, refactor, etc.)
+3. Completeness and readiness for commit
+4. Potential issues or concerns
+5. Suggested commit message(s) if changes are ready
+6. Recommendations for organizing commits if changes should be split`, changeType, content)
+		return prompt
+
 	default:
 		return content
 	}
