@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 )
 
 // OllamaProvider implements the Provider interface for Ollama
@@ -15,6 +14,8 @@ type OllamaProvider struct {
 	endpoint    string
 	model       string
 	temperature float64
+	retryConfig RetryConfig
+	httpClient  *http.Client
 }
 
 // NewOllamaProvider creates a new Ollama provider
@@ -38,6 +39,8 @@ func NewOllamaProvider(config Config) (*OllamaProvider, error) {
 		endpoint:    endpoint,
 		model:       model,
 		temperature: temperature,
+		retryConfig: DefaultRetryConfig(),
+		httpClient:  SharedHTTPClient,
 	}, nil
 }
 
@@ -65,10 +68,7 @@ func (p *OllamaProvider) Analyze(ctx context.Context, prompt string) (string, er
 
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-	resp, err := client.Do(req)
+	resp, err := RetryableHTTPRequest(ctx, p.httpClient, req, p.retryConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to send request: %w", err)
 	}

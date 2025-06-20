@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 )
 
 // GoogleProvider implements the Provider interface for Google AI (Gemini)
@@ -16,6 +15,8 @@ type GoogleProvider struct {
 	model       string
 	temperature float64
 	maxTokens   int
+	retryConfig RetryConfig
+	httpClient  *http.Client
 }
 
 // NewGoogleProvider creates a new Google AI provider
@@ -44,6 +45,8 @@ func NewGoogleProvider(config Config) (*GoogleProvider, error) {
 		model:       model,
 		temperature: temperature,
 		maxTokens:   maxTokens,
+		retryConfig: DefaultRetryConfig(),
+		httpClient:  SharedHTTPClient,
 	}, nil
 }
 
@@ -82,10 +85,7 @@ func (p *GoogleProvider) Analyze(ctx context.Context, prompt string) (string, er
 
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-	resp, err := client.Do(req)
+	resp, err := RetryableHTTPRequest(ctx, p.httpClient, req, p.retryConfig)
 	if err != nil {
 		return "", fmt.Errorf("failed to send request: %w", err)
 	}
