@@ -186,13 +186,12 @@ func getCommitInfo(ctx context.Context, repoPath, commitSHA string) (string, err
 	info.WriteString(string(output))
 	info.WriteString("\n\n")
 
-	// Get the actual diff
-	diffCmd := exec.CommandContext(ctx, "git", "-C", repoPath, "diff", commitSHA+"^", commitSHA)
-	diffOutput, err := diffCmd.Output()
+	// Get the actual diff using safe memory-limited approach
+	memConfig := &cfg.Memory
+	truncatedDiff, err := getGitDiffSafe(ctx, repoPath, memConfig, commitSHA+"^", commitSHA)
 	if err != nil {
 		// If this is the first commit, try to get the full content
-		diffCmd = exec.CommandContext(ctx, "git", "-C", repoPath, "show", commitSHA)
-		diffOutput, err = diffCmd.Output()
+		truncatedDiff, err = getGitDiffSafe(ctx, repoPath, memConfig, commitSHA)
 		if err != nil {
 			// If both commands fail, return a meaningful error
 			return "", fmt.Errorf("failed to get commit diff: %v", err)
@@ -201,7 +200,14 @@ func getCommitInfo(ctx context.Context, repoPath, commitSHA string) (string, err
 	} else {
 		info.WriteString("Diff:\n")
 	}
-	info.WriteString(string(diffOutput))
+
+	// Add warning if truncated
+	if truncatedDiff.IsTruncated {
+		info.WriteString(fmt.Sprintf("\n⚠️ WARNING: %s\n", truncatedDiff.WarningReason))
+		info.WriteString(fmt.Sprintf("Total size: %dKB, Files: %d\n\n", truncatedDiff.TotalSizeKB, truncatedDiff.FileCount))
+	}
+
+	info.WriteString(truncatedDiff.Content)
 
 	return info.String(), nil
 }
@@ -348,36 +354,42 @@ func getUncommittedChanges(ctx context.Context, repoPath string, stagedOnly bool
 	info.WriteString(string(statusOutput))
 	info.WriteString("\n")
 
-	// Get diff
-	var diffCmd *exec.Cmd
+	// Get diff using safe memory-limited approach
+	memConfig := &cfg.Memory
+	var truncatedDiff *TruncatedDiff
+
 	if stagedOnly {
 		// Get only staged changes
-		diffCmd = exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "--cached")
+		truncatedDiff, err = getGitDiffSafe(ctx, repoPath, memConfig, "--cached")
 	} else {
 		// Get all changes (staged and unstaged)
-		diffCmd = exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "HEAD")
+		truncatedDiff, err = getGitDiffSafe(ctx, repoPath, memConfig, "HEAD")
 	}
 
-	diffOutput, err := diffCmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to get diff: %v", err)
 	}
 
 	// If no diff from HEAD, try to get staged changes
-	if len(diffOutput) == 0 && !stagedOnly {
-		diffCmd = exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "--cached")
-		stagedOutput, err := diffCmd.Output()
+	if truncatedDiff.Content == "" && !stagedOnly {
+		stagedDiff, err := getGitDiffSafe(ctx, repoPath, memConfig, "--cached")
 		if err != nil {
 			// Log the error but continue since we might have unstaged changes
 			info.WriteString(fmt.Sprintf("\nNote: Failed to get staged changes: %v\n", err))
 		} else {
-			diffOutput = stagedOutput
+			truncatedDiff = stagedDiff
 		}
 	}
 
-	if len(diffOutput) > 0 {
+	if truncatedDiff.Content != "" {
+		// Add warning if truncated
+		if truncatedDiff.IsTruncated {
+			info.WriteString(fmt.Sprintf("\n⚠️ WARNING: %s\n", truncatedDiff.WarningReason))
+			info.WriteString(fmt.Sprintf("Total size: %dKB, Files: %d\n\n", truncatedDiff.TotalSizeKB, truncatedDiff.FileCount))
+		}
+
 		info.WriteString("Diff:\n")
-		info.WriteString(string(diffOutput))
+		info.WriteString(truncatedDiff.Content)
 	}
 
 	// Get statistics

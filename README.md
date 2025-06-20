@@ -11,6 +11,7 @@ An MCP (Model Context Protocol) server that assists Claude Code in reviewing com
 - **Repository Information**: Get information about git repositories
 - **Multiple LLM Support**: Works with OpenAI, Google Gemini, Ollama (local), and Mistral AI
 - **Security**: Input validation, secure path handling, and API key protection
+- **Memory Safety**: Configurable memory limits and streaming support for large diffs
 
 ## Installation
 
@@ -70,6 +71,13 @@ Create a `.second-opinion.json` file in your home directory:
   "mistral": {
     "api_key": "your-mistral-api-key",
     "model": "mistral-small-latest"
+  },
+  "memory": {
+    "max_diff_size_mb": 10,
+    "max_file_count": 1000,
+    "max_line_length": 1000,
+    "enable_streaming": true,
+    "chunk_size_mb": 1
   }
 }
 ```
@@ -350,6 +358,10 @@ Contributions are welcome! Please:
 4. Submit a pull request
 
 See [TODO.md](TODO.md) for planned features and known issues.
+
+## Memory Usage
+
+For large repositories, see [docs/MEMORY_USAGE.md](docs/MEMORY_USAGE.md) for configuration options to handle large diffs efficiently.
 
 ## License
 

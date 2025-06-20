@@ -9,6 +9,15 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// MemoryConfig holds memory management settings
+type MemoryConfig struct {
+	MaxDiffSizeMB   int  `json:"max_diff_size_mb"`
+	MaxFileCount    int  `json:"max_file_count"`
+	MaxLineLength   int  `json:"max_line_length"`
+	EnableStreaming bool `json:"enable_streaming"`
+	ChunkSizeMB     int  `json:"chunk_size_mb"`
+}
+
 // Config holds the application configuration.
 type Config struct {
 	// Default provider settings
@@ -37,7 +46,11 @@ type Config struct {
 	// Server settings
 	ServerName    string `json:"server_name"`
 	ServerVersion string `json:"server_version"`
-	ConfigType    string
+
+	// Memory management settings
+	Memory MemoryConfig `json:"memory"`
+
+	ConfigType string
 }
 
 func Load() (*Config, error) {
@@ -63,6 +76,25 @@ func loadFromHome() (*Config, error) {
 
 	conf := Config{ConfigType: ".second-opinion.json"}
 	err = json.NewDecoder(f).Decode(&conf)
+
+	// Set memory defaults if not specified in JSON
+	if conf.Memory.MaxDiffSizeMB == 0 {
+		conf.Memory.MaxDiffSizeMB = 10
+	}
+	if conf.Memory.MaxFileCount == 0 {
+		conf.Memory.MaxFileCount = 1000
+	}
+	if conf.Memory.MaxLineLength == 0 {
+		conf.Memory.MaxLineLength = 1000
+	}
+	if conf.Memory.ChunkSizeMB == 0 {
+		conf.Memory.ChunkSizeMB = 1
+	}
+	// EnableStreaming defaults to true unless explicitly set to false
+	if !conf.Memory.EnableStreaming && conf.Memory.MaxDiffSizeMB > 0 {
+		conf.Memory.EnableStreaming = true
+	}
+
 	return &conf, err
 }
 
@@ -108,6 +140,38 @@ func loadEnv() (*Config, error) {
 			cfg.MaxTokens = t
 		} else {
 			cfg.MaxTokens = 4096
+		}
+	}
+
+	// Set memory defaults
+	cfg.Memory.MaxDiffSizeMB = 10
+	cfg.Memory.MaxFileCount = 1000
+	cfg.Memory.MaxLineLength = 1000
+	cfg.Memory.EnableStreaming = true
+	cfg.Memory.ChunkSizeMB = 1
+
+	// Override with environment variables if set
+	if maxDiff := getEnv("MAX_DIFF_SIZE_MB", ""); maxDiff != "" {
+		if v, err := strconv.Atoi(maxDiff); err == nil {
+			cfg.Memory.MaxDiffSizeMB = v
+		}
+	}
+	if maxFiles := getEnv("MAX_FILE_COUNT", ""); maxFiles != "" {
+		if v, err := strconv.Atoi(maxFiles); err == nil {
+			cfg.Memory.MaxFileCount = v
+		}
+	}
+	if maxLine := getEnv("MAX_LINE_LENGTH", ""); maxLine != "" {
+		if v, err := strconv.Atoi(maxLine); err == nil {
+			cfg.Memory.MaxLineLength = v
+		}
+	}
+	if streaming := getEnv("ENABLE_STREAMING", ""); streaming != "" {
+		cfg.Memory.EnableStreaming = streaming == "true" || streaming == "1"
+	}
+	if chunkSize := getEnv("CHUNK_SIZE_MB", ""); chunkSize != "" {
+		if v, err := strconv.Atoi(chunkSize); err == nil {
+			cfg.Memory.ChunkSizeMB = v
 		}
 	}
 

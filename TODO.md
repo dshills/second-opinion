@@ -19,17 +19,19 @@
 12. **Added Context Cancellation** - All git commands now use `exec.CommandContext`
 13. **Added Error Handling Tests** - Created `handlers_test.go` with comprehensive tests
 
+### Phase 3: Memory Optimization (Completed)
+14. **Implemented Memory-Safe Diff Handling** - Created `memory.go` with streaming support
+15. **Added Size Limits** - Pre-flight checks prevent loading oversized diffs
+16. **Line Truncation** - Long lines are truncated to prevent memory issues
+17. **Configuration Support** - Added `MemoryConfig` in config with JSON and env var support
+18. **Comprehensive Tests** - Created `memory_test.go` with truncation and streaming tests
+19. **Documentation** - Created `docs/MEMORY_USAGE.md` with guidelines and best practices
+
 ## Outstanding Issues
 
 ### Performance Issues (High Priority)
 
-#### 1. Memory Usage with Large Diffs
-- **File**: `handlers.go`, Multiple locations
-- **Issue**: Large diffs loaded entirely into memory
-- **Fix**: Implement streaming or size limits
-- **Impact**: Prevents OOM errors on large repositories
-
-#### 2. Add Progress Indicators
+#### 1. Add Progress Indicators
 - **Issue**: Long-running LLM calls have no feedback
 - **Fix**: Add progress callbacks or status updates
 - **Impact**: Better user experience
@@ -163,7 +165,7 @@
 ### Sprint 1: Performance & Reliability (Current Focus)
 1. ✅ Fix all error handling issues
 2. ✅ Add context cancellation support
-3. **Memory limits for large diffs** (In Progress)
+3. ✅ Memory limits for large diffs
 4. **Add retry logic with backoff**
 5. **Connection pooling for HTTP clients**
 
