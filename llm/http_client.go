@@ -50,4 +50,3 @@ func NewOptimizedHTTPClient(config HTTPClientConfig) *http.Client {
 
 // SharedHTTPClient provides a singleton HTTP client optimized for LLM API calls
 var SharedHTTPClient = NewOptimizedHTTPClient(DefaultHTTPClientConfig())
-

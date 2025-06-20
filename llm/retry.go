@@ -1,8 +1,10 @@
 package llm
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"math"
 	"net"
 	"net/http"
@@ -88,9 +90,25 @@ func (rc RetryConfig) CalculateDelay(attempt int) time.Duration {
 func RetryableHTTPRequest(ctx context.Context, client *http.Client, req *http.Request, config RetryConfig) (*http.Response, error) {
 	var lastErr error
 
+	// Read the request body once if it exists
+	var bodyBytes []byte
+	if req.Body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(req.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read request body: %w", err)
+		}
+		req.Body.Close()
+	}
+
 	for attempt := 0; attempt <= config.MaxRetries; attempt++ {
 		// Clone the request for retry attempts
 		reqCopy := req.Clone(ctx)
+
+		// Set a new body reader for each attempt
+		if bodyBytes != nil {
+			reqCopy.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		}
 
 		resp, err := client.Do(reqCopy)
 

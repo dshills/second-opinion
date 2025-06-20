@@ -161,4 +161,3 @@ func TestHTTPClientOptimizations(t *testing.T) {
 		t.Error("HTTP/2 should be enabled for better performance")
 	}
 }
-
