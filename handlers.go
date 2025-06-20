@@ -112,7 +112,7 @@ func handleRepoInfo(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		return mcp.NewToolResultError(fmt.Sprintf("Invalid repository path: %v", err)), nil
 	}
 
-	info := getRepoInfo(validPath)
+	info := getRepoInfo(ctx, validPath)
 
 	return mcp.NewToolResultText(info), nil
 }
@@ -157,7 +157,7 @@ func handleCommitAnalysis(ctx context.Context, request mcp.CallToolRequest) (*mc
 	}
 
 	// Get commit information
-	commitInfo, err := getCommitInfo(validPath, commitSHA)
+	commitInfo, err := getCommitInfo(ctx, validPath, commitSHA)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -174,11 +174,11 @@ func handleCommitAnalysis(ctx context.Context, request mcp.CallToolRequest) (*mc
 	return mcp.NewToolResultText(analysis), nil
 }
 
-func getCommitInfo(repoPath, commitSHA string) (string, error) {
+func getCommitInfo(ctx context.Context, repoPath, commitSHA string) (string, error) {
 	var info strings.Builder
 
 	// Get commit info with diff
-	cmd := exec.Command("git", "-C", repoPath, "show", "--stat", commitSHA)
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "show", "--stat", commitSHA)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to get commit info: %v", err)
@@ -187,39 +187,71 @@ func getCommitInfo(repoPath, commitSHA string) (string, error) {
 	info.WriteString("\n\n")
 
 	// Get the actual diff
-	diffCmd := exec.Command("git", "-C", repoPath, "diff", commitSHA+"^", commitSHA)
+	diffCmd := exec.CommandContext(ctx, "git", "-C", repoPath, "diff", commitSHA+"^", commitSHA)
 	diffOutput, err := diffCmd.Output()
 	if err != nil {
-		// If this is the first commit, just get the full content
-		diffCmd = exec.Command("git", "-C", repoPath, "show", commitSHA)
-		diffOutput, _ = diffCmd.Output()
+		// If this is the first commit, try to get the full content
+		diffCmd = exec.CommandContext(ctx, "git", "-C", repoPath, "show", commitSHA)
+		diffOutput, err = diffCmd.Output()
+		if err != nil {
+			// If both commands fail, return a meaningful error
+			return "", fmt.Errorf("failed to get commit diff: %v", err)
+		}
+		info.WriteString("Diff (first commit):\n")
+	} else {
+		info.WriteString("Diff:\n")
 	}
-	info.WriteString("Diff:\n")
 	info.WriteString(string(diffOutput))
 
 	return info.String(), nil
 }
 
-func getRepoInfo(repoPath string) string {
+func getRepoInfo(ctx context.Context, repoPath string) string {
 	var info strings.Builder
+	var warnings []string
 
 	// Get current branch
-	branchCmd := exec.Command("git", "-C", repoPath, "branch", "--show-current")
-	branch, _ := branchCmd.Output()
+	branchCmd := exec.CommandContext(ctx, "git", "-C", repoPath, "branch", "--show-current")
+	branch, err := branchCmd.Output()
+	if err != nil {
+		warnings = append(warnings, fmt.Sprintf("Failed to get current branch: %v", err))
+		branch = []byte("unknown")
+	}
 
 	// Get remote URL
-	remoteCmd := exec.Command("git", "-C", repoPath, "remote", "get-url", "origin")
-	remote, _ := remoteCmd.Output()
+	remoteCmd := exec.CommandContext(ctx, "git", "-C", repoPath, "remote", "get-url", "origin")
+	remote, err := remoteCmd.Output()
+	if err != nil {
+		// This is common for repos without remotes, so just note it
+		remote = []byte("(no remote configured)")
+	}
 
 	// Get recent commits
-	logCmd := exec.Command("git", "-C", repoPath, "log", "--oneline", "-5")
-	recentCommits, _ := logCmd.Output()
+	logCmd := exec.CommandContext(ctx, "git", "-C", repoPath, "log", "--oneline", "-5")
+	recentCommits, err := logCmd.Output()
+	if err != nil {
+		warnings = append(warnings, fmt.Sprintf("Failed to get commit history: %v", err))
+		recentCommits = []byte("(unable to retrieve commit history)")
+	}
 
 	// Get status
-	statusCmd := exec.Command("git", "-C", repoPath, "status", "--short")
-	status, _ := statusCmd.Output()
+	statusCmd := exec.CommandContext(ctx, "git", "-C", repoPath, "status", "--short")
+	status, err := statusCmd.Output()
+	if err != nil {
+		warnings = append(warnings, fmt.Sprintf("Failed to get repository status: %v", err))
+	}
 
 	info.WriteString("📁 Repository Information:\n\n")
+
+	// Add any warnings at the top
+	if len(warnings) > 0 {
+		info.WriteString("⚠️ Warnings:\n")
+		for _, warning := range warnings {
+			info.WriteString(fmt.Sprintf("- %s\n", warning))
+		}
+		info.WriteString("\n")
+	}
+
 	info.WriteString(fmt.Sprintf("Branch: %s", branch))
 	info.WriteString(fmt.Sprintf("Remote: %s", remote))
 	info.WriteString("\nRecent commits:\n")
@@ -268,7 +300,7 @@ func handleAnalyzeUncommittedWork(ctx context.Context, request mcp.CallToolReque
 	}
 
 	// Get uncommitted changes
-	diffContent, err := getUncommittedChanges(validPath, stagedOnly)
+	diffContent, err := getUncommittedChanges(ctx, validPath, stagedOnly)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -291,7 +323,7 @@ func handleAnalyzeUncommittedWork(ctx context.Context, request mcp.CallToolReque
 	return mcp.NewToolResultText(analysis), nil
 }
 
-func getUncommittedChanges(repoPath string, stagedOnly bool) (string, error) {
+func getUncommittedChanges(ctx context.Context, repoPath string, stagedOnly bool) (string, error) {
 	var info strings.Builder
 
 	// Add header
@@ -302,7 +334,7 @@ func getUncommittedChanges(repoPath string, stagedOnly bool) (string, error) {
 	}
 
 	// Get status summary
-	statusCmd := exec.Command("git", "-C", repoPath, "status", "--short")
+	statusCmd := exec.CommandContext(ctx, "git", "-C", repoPath, "status", "--short")
 	statusOutput, err := statusCmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to get git status: %v", err)
@@ -320,10 +352,10 @@ func getUncommittedChanges(repoPath string, stagedOnly bool) (string, error) {
 	var diffCmd *exec.Cmd
 	if stagedOnly {
 		// Get only staged changes
-		diffCmd = exec.Command("git", "-C", repoPath, "diff", "--cached")
+		diffCmd = exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "--cached")
 	} else {
 		// Get all changes (staged and unstaged)
-		diffCmd = exec.Command("git", "-C", repoPath, "diff", "HEAD")
+		diffCmd = exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "HEAD")
 	}
 
 	diffOutput, err := diffCmd.Output()
@@ -333,8 +365,14 @@ func getUncommittedChanges(repoPath string, stagedOnly bool) (string, error) {
 
 	// If no diff from HEAD, try to get staged changes
 	if len(diffOutput) == 0 && !stagedOnly {
-		diffCmd = exec.Command("git", "-C", repoPath, "diff", "--cached")
-		diffOutput, _ = diffCmd.Output()
+		diffCmd = exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "--cached")
+		stagedOutput, err := diffCmd.Output()
+		if err != nil {
+			// Log the error but continue since we might have unstaged changes
+			info.WriteString(fmt.Sprintf("\nNote: Failed to get staged changes: %v\n", err))
+		} else {
+			diffOutput = stagedOutput
+		}
 	}
 
 	if len(diffOutput) > 0 {
@@ -345,9 +383,9 @@ func getUncommittedChanges(repoPath string, stagedOnly bool) (string, error) {
 	// Get statistics
 	var statCmd *exec.Cmd
 	if stagedOnly {
-		statCmd = exec.Command("git", "-C", repoPath, "diff", "--cached", "--stat")
+		statCmd = exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "--cached", "--stat")
 	} else {
-		statCmd = exec.Command("git", "-C", repoPath, "diff", "HEAD", "--stat")
+		statCmd = exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "HEAD", "--stat")
 	}
 
 	statOutput, _ := statCmd.Output()
