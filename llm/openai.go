@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	OpenAIURL = "https://api.openai.com/v1/chat/completions"
+	OpenAIURL      = "https://api.openai.com/v1/chat/completions"
+	openAIProvider = "openai"
 )
 
 // OpenAIProvider implements the Provider interface for OpenAI
@@ -35,11 +36,8 @@ func NewOpenAIProvider(config Config) (*OpenAIProvider, error) {
 		model = "gpt-4o-mini"
 	}
 
+	// Use temperature as provided - OpenAI supports 0 temperature for deterministic output
 	temperature := config.Temperature
-	// Only set default if temperature wasn't explicitly set in config
-	if temperature == 0 && config.Temperature == 0 {
-		temperature = 0.3
-	}
 
 	maxTokens := config.MaxTokens
 	if maxTokens == 0 {
@@ -148,5 +146,5 @@ func (p *OpenAIProvider) Analyze(ctx context.Context, prompt string) (string, er
 
 // Name returns the provider name
 func (p *OpenAIProvider) Name() string {
-	return "openai"
+	return openAIProvider
 }
